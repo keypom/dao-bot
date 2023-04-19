@@ -1,8 +1,8 @@
 [package]
-name = "hello_near"
+name = "dao-bot"
 version = "1.0.0"
-authors = ["Near Inc <hello@near.org>"]
-edition = "2021"
+authors = ["Min Qian Lu"]
+edition = "2023"
 
 [lib]
 crate-type = ["cdylib"]
