@@ -1,0 +1,41 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Developer note: near.gitignore will be renamed to .gitignore upon project creation
+# dependencies
+node_modules
+/.pnp
+.pnp.js
+
+# build
+.next/
+/out
+frontend/dist
+
+contract/build
+contract/neardev
+contract/target
+
+# testing
+/coverage
+
+# production
+/build
+
+# misc
+.DS_Store
+/.cache
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# local env files
+.env*.local
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
