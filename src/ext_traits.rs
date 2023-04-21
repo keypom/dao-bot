@@ -11,3 +11,9 @@ trait ExtDao{
 
     fn add_proposal(&mut self, proposal: ProposalInput);
 }
+
+// #[ext_contract(ext_self)]
+// trait ContractExt{
+//     fn get_roles_callback(&self);
+// }
+

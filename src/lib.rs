@@ -10,7 +10,7 @@ mod ext_traits;
 
 use ext_traits::ext_dao;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{log, near_bindgen, AccountId, Gas, env, Promise, PromiseResult};
+use near_sdk::{log, near_bindgen, AccountId, Gas, env, Promise, PromiseResult, require};
 use near_sdk::serde::{Deserialize, Serialize};
 use std::convert::{TryFrom};
 use std::collections::HashSet;
@@ -21,7 +21,7 @@ use near_sdk::json_types::U128;
 const DEFAULT_MESSAGE: &str = "Hello";
 pub const XCC_GAS: Gas = Gas(20_000_000_000_000);
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ProposalInput {
     /// Description of this proposal.
     pub description: String,
@@ -29,7 +29,7 @@ pub struct ProposalInput {
     pub kind: ProposalKind,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum ProposalKind {
     /// Add member to given role in the policy. This is short cut to updating the whole policy.
     AddMemberToRole { member_id: AccountId, role: String },
@@ -93,12 +93,12 @@ pub enum Action {
 // Define the contract structure
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
-pub struct DaoBot {
+pub struct Contract {
     message: String,
 }
 
 // Define the default, which automatically initializes the contract
-impl Default for DaoBot{
+impl Default for Contract{
     fn default() -> Self{
         Self{message: DEFAULT_MESSAGE.to_string()}
     }
@@ -106,39 +106,96 @@ impl Default for DaoBot{
 
 // Implement the contract structure
 #[near_bindgen]
-impl DaoBot {
+impl Contract {
     // Public method - returns the greeting saved, defaulting to DEFAULT_MESSAGE
-    pub fn new_proposal(proposal: ProposalInput, keypom_args: KeypomArgs, funder: String, member: String) {
+    // send attached deposit down waterfall; each ext or ext_dao call should have the attached deposit sent
+    // make sure sent amount is less than received amount, otherwise vulnerable to sybil attacks
+    #[payable]
+    pub fn new_proposal(keypom_args: KeypomArgs, funder: String, dao_contract: String, proposal: ProposalInput) {
+        // Ensure Keypom called this function
+        require!(keypom_args.funder_id_field == Some("funder".to_string()) && keypom_args.account_id_field == Some("proposal.kind.AddMemberToRole.member_id".to_string()), "KEYPOM MUST SEND THESE ARGS");
         
+        Self::ext(env::current_account_id())
+        .get_roles(dao_contract, funder, proposal);
     }
 
-    pub fn get_roles(dao_contract: String) {
+    pub fn test(proposal: ProposalInput) {
+        // Check if ProposalInput object can be made from input proposal
+        // let prop: ProposalInput = near_sdk::serde_json::from_str(&proposal).expect("Not valid SaleArgs");
+        log!("I made it here!");
+        log!("{:?}", proposal);
+        log!("Breaking it all apart");
+        match proposal.kind{
+            ProposalKind::AddMemberToRole { member_id, role } => {
+                log!("{}", role);
+                log!("{}", member_id);
+            }
+            _ => log!("NEITHER"),
+
+        };
+    }
+    
+    #[payable]
+    pub fn get_roles(dao_contract: String, funder: String, proposal: ProposalInput) -> Promise {
         ext_dao::ext(AccountId::try_from(dao_contract.to_string()).unwrap())
         .get_policy()
         .then(
             Self::ext(env::current_account_id())
-            .get_roles_callback()
-        );
+            .get_roles_callback(dao_contract, funder, proposal)
+        )
+        // .then(
+        //     Self::ext(env::current_account_id())
+        //     .new_proposal()
+        // )
     }
-
-    pub fn get_roles_callback(){
-
-    }
-
-    // Public method - accepts a greeting, such as "howdy", and records it
-    pub fn callback_new_proposal() {
+    
+    // Roles callback, parse and return council role(s)
+    #[payable]
+    #[private]
+    pub fn get_roles_callback(dao_contract: String, funder: String, proposal: ProposalInput){
         assert_eq!(env::promise_results_count(), 1, "ERR_TOO_MANY_RESULTS");
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(val) => {
-                if let Ok(is_allowlisted) = near_sdk::serde_json::from_slice::<bool>(&val) {
-                    is_allowlisted
-                } else {
-                    env::panic_str("ERR_WRONG_VAL_RECEIVED")
-                }
-            },
-            PromiseResult::Failed => env::panic_str("ERR_CALL_FAILED"),
+                if let Ok(pol) = near_sdk::serde_json::from_slice::<Policy>(&val) {
+                    // Trying to collect all roles with name council from policy
+                    let members = pol.roles.into_iter()
+                    .filter(|role| role.name == "council".to_string())
+                    .collect::<Vec<RolePermission>>()
+                    .into_iter()
+                    .nth(0)
+                    .unwrap().kind;
+
+                    match members{
+                        RoleKind::Group(set) => {
+                            // If drop funder is on council
+                            if set.contains(&AccountId::try_from(funder.to_string()).unwrap()){
+                                ext_dao::ext(AccountId::try_from(dao_contract.to_string()).unwrap())
+                                .add_proposal(proposal);
+                            }
+                        }
+                        _ => (),
+                    };
+
+                    // let is_good: bool = match members{
+                    //     RoleKind::Group(set) => {
+                    //         set.contains(&AccountId::try_from("minqianlu.testnet".to_string()).unwrap())
+                    //     }
+                    //     _ => false,
+                    // };
+
+                    // is_good 
+            } else {
+                env::panic_str("ERR_WRONG_VAL_RECEIVED")
+            }
+        },
+        PromiseResult::Failed => env::panic_str("ERR_CALL_FAILED"),
+        } 
     }
+    
+
+    pub fn callback_new_proposal(){
+
     }
 }
 
@@ -146,17 +203,17 @@ impl DaoBot {
  * The rest of this file holds the inline tests for the code above
  * Learn more about Rust tests: https://doc.rust-lang.org/book/ch11-01-writing-tests.html
  */
-#[cfg(test)]
-mod tests {
-    use super::*;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
 
-    #[test]
-    fn get_default_greeting() {
+//     #[test]
+//     fn get_default_greeting() {
         
-    }
+//     }
 
-    #[test]
-    fn set_then_get_greeting() {
+//     #[test]
+//     fn set_then_get_greeting() {
         
-    }
-}
+//     }
+// }
