@@ -10,7 +10,7 @@ mod ext_traits;
 
 use ext_traits::ext_dao;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{log, near_bindgen, AccountId, Gas, env, Promise, PromiseResult, require};
+use near_sdk::{log, near_bindgen, AccountId, Gas, env, Promise, PromiseResult, require, ONE_NEAR, Balance};
 use near_sdk::serde::{Deserialize, Serialize};
 use std::convert::{TryFrom};
 use std::collections::HashSet;
@@ -20,6 +20,7 @@ use near_sdk::json_types::U128;
 // Define the default message
 const DEFAULT_MESSAGE: &str = "Hello";
 pub const XCC_GAS: Gas = Gas(20_000_000_000_000);
+pub const ONETWOFIVE_NEAR: Balance = 1250000000000000000000000;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProposalInput {
@@ -113,11 +114,13 @@ impl Contract {
     #[payable]
     pub fn new_proposal(keypom_args: KeypomArgs, funder: String, dao_contract: String, proposal: ProposalInput) {
         // Ensure Keypom called this function
+        log!("{}", env::attached_deposit());
         require!(keypom_args.funder_id_field == Some("funder".to_string()) && keypom_args.account_id_field == Some("proposal.kind.AddMemberToRole.member_id".to_string()), "KEYPOM MUST SEND THESE ARGS");
-        
+        require!(env::attached_deposit() >= ONETWOFIVE_NEAR, "ATTACH MORE NEAR, AT LEAST 1.25 $NEAR");
         Self::ext(env::current_account_id())
+        .with_attached_deposit(ONETWOFIVE_NEAR)
         .get_roles(dao_contract, funder, proposal);
-    }
+    } 
 
     pub fn test(proposal: ProposalInput) {
         // Check if ProposalInput object can be made from input proposal
@@ -137,10 +140,13 @@ impl Contract {
     
     #[payable]
     pub fn get_roles(dao_contract: String, funder: String, proposal: ProposalInput) -> Promise {
+        log!("{}", env::attached_deposit());
+        require!(env::attached_deposit() >= ONETWOFIVE_NEAR, "ATTACH MORE NEAR, AT LEAST 1.25 $NEAR");
         ext_dao::ext(AccountId::try_from(dao_contract.to_string()).unwrap())
         .get_policy()
         .then(
             Self::ext(env::current_account_id())
+            .with_attached_deposit(ONETWOFIVE_NEAR)
             .get_roles_callback(dao_contract, funder, proposal)
         )
         // .then(
@@ -153,6 +159,8 @@ impl Contract {
     #[payable]
     #[private]
     pub fn get_roles_callback(dao_contract: String, funder: String, proposal: ProposalInput){
+        log!("{}", env::attached_deposit());
+        require!(env::attached_deposit() >= ONETWOFIVE_NEAR, "ATTACH MORE NEAR, AT LEAST 1.25 $NEAR");
         assert_eq!(env::promise_results_count(), 1, "ERR_TOO_MANY_RESULTS");
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
@@ -171,6 +179,7 @@ impl Contract {
                             // If drop funder is on council
                             if set.contains(&AccountId::try_from(funder.to_string()).unwrap()){
                                 ext_dao::ext(AccountId::try_from(dao_contract.to_string()).unwrap())
+                                .with_attached_deposit(ONETWOFIVE_NEAR)
                                 .add_proposal(proposal);
                             }
                         }
