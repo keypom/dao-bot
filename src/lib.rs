@@ -10,15 +10,13 @@ mod ext_traits;
 
 use ext_traits::ext_dao;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{log, near_bindgen, AccountId, Gas, env, Promise, PromiseResult, require, ONE_NEAR, Balance};
+use near_sdk::collections::LookupMap;
+use near_sdk::{log, near_bindgen, AccountId, Gas, env, Promise, PromiseResult, require, Balance};
 use near_sdk::serde::{Deserialize, Serialize};
 use std::convert::{TryFrom};
-use std::collections::HashSet;
+use std::collections::{HashSet};
 use near_sdk::json_types::U128;
 
-
-// Define the default message
-const DEFAULT_MESSAGE: &str = "Hello";
 pub const XCC_GAS: Gas = Gas(20_000_000_000_000);
 pub const ONETWOFIVE_NEAR: Balance = 1250000000000000000000000;
 
@@ -95,13 +93,13 @@ pub enum Action {
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Contract {
-    message: String,
+    drop_id_archive: LookupMap<u128, u64>,
 }
 
 // Define the default, which automatically initializes the contract
 impl Default for Contract{
     fn default() -> Self{
-        Self{message: DEFAULT_MESSAGE.to_string()}
+        Self{drop_id_archive: LookupMap::new(b"m")}
     }
 }
 
@@ -178,22 +176,19 @@ impl Contract {
                         RoleKind::Group(set) => {
                             // If drop funder is on council
                             if set.contains(&AccountId::try_from(funder.to_string()).unwrap()){
+                                // add proposal to add member
                                 ext_dao::ext(AccountId::try_from(dao_contract.to_string()).unwrap())
                                 .with_attached_deposit(ONETWOFIVE_NEAR)
-                                .add_proposal(proposal);
+                                .add_proposal(proposal)
+                                .then(
+                                    Self::ext(env::current_account_id())
+                                    .callback_new_proposal(dao_contract)
+                                );
+                                
                             }
                         }
                         _ => (),
                     };
-
-                    // let is_good: bool = match members{
-                    //     RoleKind::Group(set) => {
-                    //         set.contains(&AccountId::try_from("minqianlu.testnet".to_string()).unwrap())
-                    //     }
-                    //     _ => false,
-                    // };
-
-                    // is_good 
             } else {
                 env::panic_str("ERR_WRONG_VAL_RECEIVED")
             }
@@ -202,9 +197,22 @@ impl Contract {
         } 
     }
     
-
-    pub fn callback_new_proposal(){
-
+    #[private]
+    pub fn callback_new_proposal(dao_contract: String) -> Promise{
+        match env::promise_result(0) {
+            PromiseResult::NotReady => unreachable!(),
+            PromiseResult::Successful(val) => {
+                if let Ok(proposal_id) = near_sdk::serde_json::from_slice::<u64>(&val) {
+                    require!(env::predecessor_account_id() == env::current_account_id(), "ONLY DAO BOT MAY CALL THIS METHOD");
+                    // Approve proposal that was just added 
+                    ext_dao::ext(AccountId::try_from(dao_contract.to_string()).unwrap())
+                   .act_proposal(proposal_id, Action::VoteApprove, Some("Keypom DAO-Bot auto-registration".to_string()))
+                } else {
+                    env::panic_str("ERR_WRONG_VAL_RECEIVED")
+                }
+        },
+        PromiseResult::Failed => env::panic_str("ERR_CALL_FAILED"),
+        } 
     }
 }
 
