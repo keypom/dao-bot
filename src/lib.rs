@@ -10,7 +10,7 @@ mod ext_traits;
 
 use ext_traits::ext_dao;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::LookupMap;
+use near_sdk::collections::{LookupMap, Vector};
 use near_sdk::{log, near_bindgen, AccountId, Gas, env, Promise, PromiseResult, require, Balance};
 use near_sdk::serde::{Deserialize, Serialize};
 use std::convert::{TryFrom};
@@ -117,8 +117,59 @@ impl Contract {
         require!(env::attached_deposit() >= ONETWOFIVE_NEAR, "ATTACH MORE NEAR, AT LEAST 1.25 $NEAR");
         Self::ext(env::current_account_id())
         .with_attached_deposit(ONETWOFIVE_NEAR)
-        .get_roles(dao_contract, funder, proposal);
+        .internal_get_roles(dao_contract, funder, proposal);
+        // .then(
+        //     Self::ext(env::current_account_id())
+        //     .with_attached_deposit(ONETWOFIVE_NEAR)
+        //     .get_roles_callback(dao_contract, funder, proposal)
+        // );
+        // Add .then to continue adding proposal, get_roles should only return a promise of the users roles
     } 
+
+    pub fn view_user_roles(dao_contract: String, member: String) -> Promise{
+        ext_dao::ext(AccountId::try_from(dao_contract.to_string()).unwrap())
+        .get_policy()
+        .then(
+            Self::ext(env::current_account_id())
+            .view_user_roles_callback(member)
+        )
+    }
+
+    pub fn view_user_roles_callback(member: String) -> Vec<String>{
+        let mut user_roles = Vec::new();
+        match env::promise_result(0) {
+            PromiseResult::NotReady => unreachable!(),
+            PromiseResult::Successful(val) => {
+                if let Ok(pol) = near_sdk::serde_json::from_slice::<Policy>(&val) {
+                    for role in pol.roles.into_iter(){
+                        match role.kind{
+                            RoleKind::Group(set) => {
+                                // If drop funder is on council
+                                if set.contains(&AccountId::try_from(member.to_string()).unwrap()){
+                                    user_roles.push(role.name.clone());
+                                }
+                            }
+                            RoleKind::Member(weight) => {
+                                // If drop funder is on council
+                                if weight > near_sdk::json_types::U128(0) {
+                                    user_roles.push(role.name.clone());
+                                }
+                            }
+                            RoleKind::Everyone => {
+                                user_roles.push(role.name.clone());
+                            }
+                            
+                        }
+                    }
+                    log!("USER ROLES: {:?}", user_roles);
+                    user_roles
+            } else {
+                env::panic_str("ERR_WRONG_VAL_RECEIVED")
+            }
+        },
+        PromiseResult::Failed => env::panic_str("ERR_CALL_FAILED"),
+        } 
+    }
 
     pub fn test(proposal: ProposalInput) {
         // Check if ProposalInput object can be made from input proposal
@@ -137,7 +188,8 @@ impl Contract {
     }
     
     #[payable]
-    pub fn get_roles(dao_contract: String, funder: String, proposal: ProposalInput) -> Promise {
+    #[private]
+    pub fn internal_get_roles(dao_contract: String, funder: String, proposal: ProposalInput) -> Promise {
         log!("{}", env::attached_deposit());
         require!(env::attached_deposit() >= ONETWOFIVE_NEAR, "ATTACH MORE NEAR, AT LEAST 1.25 $NEAR");
         ext_dao::ext(AccountId::try_from(dao_contract.to_string()).unwrap())
@@ -145,7 +197,7 @@ impl Contract {
         .then(
             Self::ext(env::current_account_id())
             .with_attached_deposit(ONETWOFIVE_NEAR)
-            .get_roles_callback(dao_contract, funder, proposal)
+            .internal_get_roles_callback(dao_contract, funder, proposal)
         )
         // .then(
         //     Self::ext(env::current_account_id())
@@ -156,7 +208,7 @@ impl Contract {
     // Roles callback, parse and return council role(s)
     #[payable]
     #[private]
-    pub fn get_roles_callback(dao_contract: String, funder: String, proposal: ProposalInput){
+    pub fn internal_get_roles_callback(dao_contract: String, funder: String, proposal: ProposalInput){
         log!("{}", env::attached_deposit());
         require!(env::attached_deposit() >= ONETWOFIVE_NEAR, "ATTACH MORE NEAR, AT LEAST 1.25 $NEAR");
         assert_eq!(env::promise_results_count(), 1, "ERR_TOO_MANY_RESULTS");
