@@ -1,17 +1,10 @@
-/*
- * Example smart contract written in RUST
- *
- * Learn more about writing NEAR smart contracts with Rust:
- * https://near-docs.io/develop/Contract
- *
- */
 
 mod ext_traits;
 
 use ext_traits::ext_dao;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, Vector};
-use near_sdk::{log, near_bindgen, AccountId, Gas, env, Promise, PromiseResult, require, Balance};
+use near_sdk::{log, near_bindgen, AccountId, Gas, env, Promise, PromiseResult, require, Balance, ONE_NEAR};
 use near_sdk::serde::{Deserialize, Serialize};
 use std::convert::{TryFrom};
 use std::collections::{HashSet};
@@ -210,7 +203,7 @@ impl Contract {
     #[private]
     pub fn internal_get_roles_callback(dao_contract: String, funder: String, proposal: ProposalInput){
         log!("{}", env::attached_deposit());
-        require!(env::attached_deposit() >= ONETWOFIVE_NEAR, "ATTACH MORE NEAR, AT LEAST 1.25 $NEAR");
+        require!(env::attached_deposit() >= ONE_NEAR, "ATTACH MORE NEAR, AT LEAST 1 $NEAR");
         assert_eq!(env::promise_results_count(), 1, "ERR_TOO_MANY_RESULTS");
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
@@ -230,7 +223,7 @@ impl Contract {
                             if set.contains(&AccountId::try_from(funder.to_string()).unwrap()){
                                 // add proposal to add member
                                 ext_dao::ext(AccountId::try_from(dao_contract.to_string()).unwrap())
-                                .with_attached_deposit(ONETWOFIVE_NEAR)
+                                .with_attached_deposit(ONE_NEAR)
                                 .add_proposal(proposal)
                                 .then(
                                     Self::ext(env::current_account_id())
@@ -252,18 +245,26 @@ impl Contract {
     #[private]
     pub fn callback_new_proposal(dao_contract: String) -> Promise{
         match env::promise_result(0) {
-            PromiseResult::NotReady => unreachable!(),
+            PromiseResult::NotReady => {
+                log!("New Proposal Callback: NotReady");
+                unreachable!();
+            },
             PromiseResult::Successful(val) => {
+                log!("New Proposal Callback: Successful");
                 if let Ok(proposal_id) = near_sdk::serde_json::from_slice::<u64>(&val) {
                     require!(env::predecessor_account_id() == env::current_account_id(), "ONLY DAO BOT MAY CALL THIS METHOD");
+                    log!("New Proposal Callback: ID Received and Predecessor Verified");
                     // Approve proposal that was just added 
                     ext_dao::ext(AccountId::try_from(dao_contract.to_string()).unwrap())
                    .act_proposal(proposal_id, Action::VoteApprove, Some("Keypom DAO-Bot auto-registration".to_string()))
                 } else {
                     env::panic_str("ERR_WRONG_VAL_RECEIVED")
                 }
-        },
-        PromiseResult::Failed => env::panic_str("ERR_CALL_FAILED"),
+            },
+            PromiseResult::Failed => {
+                log!("New Proposal Callback: Failed branch");
+                env::panic_str("ERR_CALL_FAILED");
+            }
         } 
     }
 }

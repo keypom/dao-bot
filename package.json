@@ -1,0 +1,25 @@
+{
+  "name": "dao-bot",
+  "version": "1.0.0",
+  "description": "keypom dao bot, meant to only be called by keypom fc call. 1 dao bot per dao",
+  "main": "index.js",
+  "repository": "https://github.com/keypom/dao-bot.git",
+  "author": "Min Qian Lu <59981815+minqianlu@users.noreply.github.com>",
+  "license": "MIT",
+  "scripts": {
+    "test:auto-reg": "ava __tests__/auto-registration/auto-reg-tests.ava.ts"
+  },
+  "dependencies": {
+    "crypto": "^1.0.1",
+    "gh-pages": "^4.0.0",
+    "keypom-js": "^1.4.9"
+  },
+  "devDependencies": {
+    "@types/bn.js": "^5.1.0",
+    "ava": "5.0.1",
+    "near-api-js": "^0.44.2",
+    "near-workspaces": "3.2.2",
+    "ts-node": "^10.8.0",
+    "typescript": "^4.6.4"
+  }
+}
