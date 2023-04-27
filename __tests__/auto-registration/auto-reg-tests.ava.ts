@@ -36,7 +36,7 @@ test.beforeEach(async (t) => {
     console.log(`DAO: ${dao.accountId}`);
     console.log(`DAO_BOT: ${daoBot.accountId}`);
 
-    // Init the dao and Keypom contracts
+    // Init the dao, daobot and Keypom contracts
     await dao.call(dao, 'new', 
     {
         config: {
@@ -45,6 +45,11 @@ test.beforeEach(async (t) => {
             metadata: ''
         }, 
         policy: [minqi.accountId]
+    })
+    
+    await daoBot.call(daoBot, 'new', 
+    {
+        dao_contract: dao.accountId
     })
 
     await keypom.call(keypom, 'new', { root_account: 'test.near', owner_id: keypom, contract_metadata: CONTRACT_METADATA });
@@ -102,6 +107,8 @@ test.beforeEach(async (t) => {
     })
 
 
+
+
     
     // await keypom.call(keypom, 'add_to_refund_allowlist', { account_id: minqi.accountId });
     
@@ -140,7 +147,6 @@ test('Normal Claiming Process', async t => {
                     receiver_id: daoBot.accountId,
                     method_name: "new_proposal",
                     args: JSON.stringify({
-                        dao_contract: dao.accountId,
                         proposal: {
                             description: "mooooooooon",
                             kind: {
@@ -171,3 +177,44 @@ test('Normal Claiming Process', async t => {
     let member1_groups: Array<String> = await minqi.call(daoBot, 'view_user_roles', {dao_contract: dao.accountId, member: member1.accountId});
     t.is(member1_groups.includes('new-onboardee-role'), true);
 });
+
+// test('Normal Claiming Process', async t => {
+//     const { keypom, dao, daoBot, minqi, member1, member2, member3 } = t.context.accounts;
+
+//     const fcData: FCData = {
+//         methods: [
+//             [
+//                 {
+//                     receiver_id: daoBot.accountId,
+//                     method_name: "new_proposal",
+//                     args: JSON.stringify({
+//                         proposal: {
+//                             description: "mooooooooon",
+//                             kind: {
+//                                 AddMemberToRole:{
+//                                     role: "new-onboardee-role",
+//                                 }
+//                             }
+//                         },
+//                     }),
+//                     funder_id_field: "funder",
+//                     account_id_field: "proposal.kind.AddMemberToRole.member_id",
+//                     attached_deposit: NEAR.parse("1.5").toString()
+//                 }
+//             ],
+//         ]   
+//     }   
+
+//     const config: DropConfig = { 
+//         uses_per_key: 1
+//     }
+
+//     let {keys, publicKeys} = await generateKeyPairs(1);
+//     await minqi.call(keypom, 'create_drop', {public_keys: publicKeys, deposit_per_use: NEAR.parse('1').toString(), fc: fcData, config}, {gas: LARGE_GAS, attachedDeposit: NEAR.parse('3').toString()});
+    
+//     await keypom.setKey(keys[0]);
+//     await keypom.call(keypom, 'claim', {account_id: member1.accountId}, {gas: WALLET_GAS});
+    
+//     let member1_groups: Array<String> = await minqi.call(daoBot, 'view_user_roles', {dao_contract: dao.accountId, member: member1.accountId});
+//     t.is(member1_groups.includes('new-onboardee-role'), true);
+// });

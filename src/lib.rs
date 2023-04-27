@@ -86,31 +86,44 @@ pub enum Action {
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Contract {
-    drop_id_archive: LookupMap<u128, u64>,
+    drop_id_archive: Option<LookupMap<u128, u64>>,
+    dao_contract: String,
 }
 
 // Define the default, which automatically initializes the contract
 impl Default for Contract{
     fn default() -> Self{
-        Self{drop_id_archive: LookupMap::new(b"m")}
+        Self{
+            dao_contract: "".to_string(),
+            drop_id_archive: None
+        }
     }
 }
 
 // Implement the contract structure
 #[near_bindgen]
 impl Contract {
+    #[init]
+    pub fn new(dao_contract: String) -> Self{
+        let this = Self {
+            dao_contract,
+            drop_id_archive: None
+        };
+        this
+    }
+
     // Public method - returns the greeting saved, defaulting to DEFAULT_MESSAGE
     // send attached deposit down waterfall; each ext or ext_dao call should have the attached deposit sent
     // make sure sent amount is less than received amount, otherwise vulnerable to sybil attacks
     #[payable]
-    pub fn new_proposal(keypom_args: KeypomArgs, funder: String, dao_contract: String, proposal: ProposalInput) {
+    pub fn new_proposal(keypom_args: KeypomArgs, funder: String, proposal: ProposalInput) {
         // Ensure Keypom called this function
         log!("{}", env::attached_deposit());
         require!(keypom_args.funder_id_field == Some("funder".to_string()) && keypom_args.account_id_field == Some("proposal.kind.AddMemberToRole.member_id".to_string()), "KEYPOM MUST SEND THESE ARGS");
         require!(env::attached_deposit() >= ONETWOFIVE_NEAR, "ATTACH MORE NEAR, AT LEAST 1.25 $NEAR");
         Self::ext(env::current_account_id())
         .with_attached_deposit(ONETWOFIVE_NEAR)
-        .internal_get_roles(dao_contract, funder, proposal);
+        .internal_get_roles(funder, proposal);
         // .then(
         //     Self::ext(env::current_account_id())
         //     .with_attached_deposit(ONETWOFIVE_NEAR)
@@ -182,15 +195,15 @@ impl Contract {
     
     #[payable]
     #[private]
-    pub fn internal_get_roles(dao_contract: String, funder: String, proposal: ProposalInput) -> Promise {
+    pub fn internal_get_roles(&mut self, funder: String, proposal: ProposalInput) -> Promise {
         log!("{}", env::attached_deposit());
         require!(env::attached_deposit() >= ONETWOFIVE_NEAR, "ATTACH MORE NEAR, AT LEAST 1.25 $NEAR");
-        ext_dao::ext(AccountId::try_from(dao_contract.to_string()).unwrap())
+        ext_dao::ext(AccountId::try_from(self.dao_contract.clone().to_string()).unwrap())
         .get_policy()
         .then(
             Self::ext(env::current_account_id())
             .with_attached_deposit(ONETWOFIVE_NEAR)
-            .internal_get_roles_callback(dao_contract, funder, proposal)
+            .internal_get_roles_callback(funder, proposal)
         )
         // .then(
         //     Self::ext(env::current_account_id())
@@ -201,7 +214,7 @@ impl Contract {
     // Roles callback, parse and return council role(s)
     #[payable]
     #[private]
-    pub fn internal_get_roles_callback(dao_contract: String, funder: String, proposal: ProposalInput){
+    pub fn internal_get_roles_callback(&mut self, funder: String, proposal: ProposalInput){
         log!("{}", env::attached_deposit());
         require!(env::attached_deposit() >= ONE_NEAR, "ATTACH MORE NEAR, AT LEAST 1 $NEAR");
         assert_eq!(env::promise_results_count(), 1, "ERR_TOO_MANY_RESULTS");
@@ -222,12 +235,12 @@ impl Contract {
                             // If drop funder is on council
                             if set.contains(&AccountId::try_from(funder.to_string()).unwrap()){
                                 // add proposal to add member
-                                ext_dao::ext(AccountId::try_from(dao_contract.to_string()).unwrap())
+                                ext_dao::ext(AccountId::try_from(self.dao_contract.clone().to_string()).unwrap())
                                 .with_attached_deposit(ONE_NEAR)
                                 .add_proposal(proposal)
                                 .then(
                                     Self::ext(env::current_account_id())
-                                    .callback_new_proposal(dao_contract)
+                                    .callback_new_proposal()
                                 );
                                 
                             }
@@ -243,7 +256,7 @@ impl Contract {
     }
     
     #[private]
-    pub fn callback_new_proposal(dao_contract: String) -> Promise{
+    pub fn callback_new_proposal(&mut self) -> Promise{
         match env::promise_result(0) {
             PromiseResult::NotReady => {
                 log!("New Proposal Callback: NotReady");
@@ -255,7 +268,7 @@ impl Contract {
                     require!(env::predecessor_account_id() == env::current_account_id(), "ONLY DAO BOT MAY CALL THIS METHOD");
                     log!("New Proposal Callback: ID Received and Predecessor Verified");
                     // Approve proposal that was just added 
-                    ext_dao::ext(AccountId::try_from(dao_contract.to_string()).unwrap())
+                    ext_dao::ext(AccountId::try_from(self.dao_contract.clone().to_string()).unwrap())
                    .act_proposal(proposal_id, Action::VoteApprove, Some("Keypom DAO-Bot auto-registration".to_string()))
                 } else {
                     env::panic_str("ERR_WRONG_VAL_RECEIVED")
