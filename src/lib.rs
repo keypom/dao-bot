@@ -3,7 +3,7 @@ mod ext_traits;
 
 use ext_traits::ext_dao;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::{LookupMap, Vector};
+use near_sdk::collections::{LookupMap};
 use near_sdk::{log, near_bindgen, AccountId, Gas, env, Promise, PromiseResult, require, Balance, ONE_NEAR};
 use near_sdk::serde::{Deserialize, Serialize};
 use std::convert::{TryFrom};
