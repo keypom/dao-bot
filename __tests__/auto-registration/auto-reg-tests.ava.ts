@@ -29,8 +29,9 @@ test.beforeEach(async (t) => {
 
     // Deploy all 3 contracts
     const keypom = await root.devDeploy(`./__tests__/ext_wasm/keypom.wasm`);
-    const dao = await root.devDeploy(`./__tests__/ext_wasm/sputnikdao2.wasm`)
-    const daoBot = await root.devDeploy(`./target/wasm32-unknown-unknown/release/dao_bot.wasm`)
+    const dao = await root.devDeploy(`./__tests__/ext_wasm/sputnikdao2.wasm`);
+    const dao2 = await root.devDeploy(`./__tests__/ext_wasm/sputnikdao2.wasm`);
+    const daoBot = await root.devDeploy(`./target/wasm32-unknown-unknown/release/dao_bot.wasm`);
 
     console.log(`KEYPOM: ${keypom.accountId}`);
     console.log(`DAO: ${dao.accountId}`);
@@ -106,10 +107,6 @@ test.beforeEach(async (t) => {
         action: 'VoteApprove'
     })
 
-
-
-
-    
     // await keypom.call(keypom, 'add_to_refund_allowlist', { account_id: minqi.accountId });
     
     let keypomBalance = await keypom.balance();
@@ -120,7 +117,7 @@ test.beforeEach(async (t) => {
 
     // Save state for test runs
     t.context.worker = worker;
-    t.context.accounts = { root, keypom, dao, daoBot, minqi, member1, member2, member3 };
+    t.context.accounts = { root, keypom, dao, dao2, daoBot, minqi, member1, member2, member3 };
 
     console.log("\u001b[1;35mDONE BEFOREEACH")
 });
@@ -135,6 +132,147 @@ test('Ensure DAO Bot Membership', async t => {
     const { keypom, dao, daoBot, minqi, member1, member2, member3 } = t.context.accounts;
     let daoBotMembership: Array<String> = await minqi.call(daoBot, 'view_user_roles', {dao_contract: dao.accountId, member: daoBot.accountId});
     t.is(daoBotMembership.includes('keypom-daobot'), true);
+});
+
+
+test('1 DAO 1 DAO_Bot with no crossover', async t => {
+    const { keypom, dao, dao2, daoBot, minqi, member1, member2, member3 } = t.context.accounts;
+
+    // Set up DAO2, member2's mock dao
+    await member2.call(dao2, 'new', 
+    {
+        config: {
+            name: 'keypomtestdao', 
+            purpose: 'to test adding members automatically', 
+            metadata: ''
+        }, 
+        policy: [member2.accountId]
+    })
+
+    // Add daoBot as its own role
+    let daobot_proposal_id = await member2.call(dao2, 'add_proposal', 
+        {   proposal: {
+                description: 'adding daobot', 
+                kind: {
+                    ChangePolicyAddOrUpdateRole: {
+                        role: {
+                            name: 'keypom-daobot', 
+                            kind: { Group: [daoBot.accountId]},
+                            permissions: ['*:*'],
+                            vote_policy: {}
+                        }
+                    }
+                },
+            }
+        },
+        {gas: new BN(30 * 10**12),
+        attachedDeposit: NEAR.parse("1").toString()}
+    );
+    
+    await member2.call(dao2, 'act_proposal',
+    {
+        id: daobot_proposal_id,
+        action: 'VoteApprove'
+    })
+
+    // Add new-onboardee-role
+    let onboardee_proposal_id = await member2.call(dao2, 'add_proposal', 
+        {   proposal: {
+                description: 'adding onboardee role', 
+                kind: {
+                    ChangePolicyAddOrUpdateRole: {
+                        role: {
+                            name: 'new-onboardee-role', 
+                            kind: { Group: [member2.accountId]},
+                            permissions: ['*:AddProposal'],
+                            vote_policy: {}
+                        }
+                    }
+                },
+            }
+        },
+        {gas: new BN(30 * 10**12),
+        attachedDeposit: NEAR.parse("1").toString()}
+    );
+    
+    await member2.call(dao2, 'act_proposal',
+    {
+        id: onboardee_proposal_id,
+        action: 'VoteApprove'
+    })
+
+    const fcData: FCData = {
+        methods: [
+            [
+                {
+                    receiver_id: daoBot.accountId,
+                    method_name: "new_proposal",
+                    args: JSON.stringify({
+                        dao_contract: dao2.accountId,
+                        proposal: {
+                            description: "mooooooooon",
+                            kind: {
+                                AddMemberToRole:{
+                                    role: "new-onboardee-role",
+                                }
+                            }
+                        },
+                    }),
+                    funder_id_field: "funder",
+                    account_id_field: "proposal.kind.AddMemberToRole.member_id",
+                    attached_deposit: NEAR.parse("1.5").toString()
+                }
+            ],
+        ]   
+    }   
+
+    const config: DropConfig = { 
+        uses_per_key: 1
+    }
+
+    // This should not work
+    let {keys, publicKeys} = await generateKeyPairs(1);
+    await member2.call(keypom, 'create_drop', {public_keys: publicKeys, deposit_per_use: NEAR.parse('1').toString(), fc: fcData, config}, {gas: LARGE_GAS, attachedDeposit: NEAR.parse('3').toString()});
+    
+    await keypom.setKey(keys[0]);
+    await keypom.call(keypom, 'claim', {account_id: member1.accountId}, {gas: WALLET_GAS});
+    
+    // Ensure call to DAO2 did not go through 
+    let member1dao2_groups: Array<String> = await minqi.call(daoBot, 'view_user_roles', {dao_contract: dao2.accountId, member: member1.accountId});
+    t.is(!member1dao2_groups.includes('new-onboardee-role'), true);
+    
+    // Ensure DAO does not have member1 as an onboardee
+    let member1dao_groups: Array<String> = await minqi.call(daoBot, 'view_user_roles', {dao_contract: dao.accountId, member: member1.accountId});
+    t.is(member1dao_groups.includes('new-onboardee-role'), false);
+});
+
+test('Calling DAO-Bot directly', async t => {
+    const { keypom, dao, daoBot, minqi, member1, member2, member3 } = t.context.accounts;
+
+    await minqi.call(daoBot, 'new_proposal', 
+    {   
+        proposal: {
+            description: 'maliciously adding onboardee role', 
+            kind: {
+                AddMemberToRole: {
+                    role: 'new-onboardee-role', 
+                    member_id: "minqi.test.near"
+                }
+            }
+        },
+        funder: "minqi.testnet",
+        keypom_args:{
+            account_id_field: "proposal.kind.AddMemberToRole.member_id",
+            funder_id_field: "funder"
+        }
+    },
+    {
+        gas: new BN(30 * 10**12),
+        attachedDeposit: NEAR.parse("1.25").toString()
+    });
+
+    let minqiMembership: Array<String> = await minqi.call(daoBot, 'view_user_roles', {dao_contract: dao.accountId, member: minqi.accountId});
+    t.is(minqiMembership.includes('new-onboardee-role'), false);
 });
 
 test('Normal Claiming Process', async t => {
@@ -177,6 +315,10 @@ test('Normal Claiming Process', async t => {
     let member1_groups: Array<String> = await minqi.call(daoBot, 'view_user_roles', {dao_contract: dao.accountId, member: member1.accountId});
     t.is(member1_groups.includes('new-onboardee-role'), true);
 });
+
+// Incorrect proposal kinds
+
+
 
 // test('Normal Claiming Process', async t => {
 //     const { keypom, dao, daoBot, minqi, member1, member2, member3 } = t.context.accounts;

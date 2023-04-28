@@ -117,6 +117,8 @@ impl Contract {
     // make sure sent amount is less than received amount, otherwise vulnerable to sybil attacks
     #[payable]
     pub fn new_proposal(keypom_args: KeypomArgs, funder: String, proposal: ProposalInput) {
+        // require!(env::predecessor_account_id() == AccountId::try_from("v2.keypom.testnet".to_string()).unwrap()) ;
+        log!("Predecessor: {}", env::predecessor_account_id());
         // Ensure Keypom called this function
         log!("{}", env::attached_deposit());
         require!(keypom_args.funder_id_field == Some("funder".to_string()) && keypom_args.account_id_field == Some("proposal.kind.AddMemberToRole.member_id".to_string()), "KEYPOM MUST SEND THESE ARGS");
@@ -131,67 +133,6 @@ impl Contract {
         // );
         // Add .then to continue adding proposal, get_roles should only return a promise of the users roles
     } 
-
-    pub fn view_user_roles(dao_contract: String, member: String) -> Promise{
-        ext_dao::ext(AccountId::try_from(dao_contract.to_string()).unwrap())
-        .get_policy()
-        .then(
-            Self::ext(env::current_account_id())
-            .view_user_roles_callback(member)
-        )
-    }
-
-    pub fn view_user_roles_callback(member: String) -> Vec<String>{
-        let mut user_roles = Vec::new();
-        match env::promise_result(0) {
-            PromiseResult::NotReady => unreachable!(),
-            PromiseResult::Successful(val) => {
-                if let Ok(pol) = near_sdk::serde_json::from_slice::<Policy>(&val) {
-                    for role in pol.roles.into_iter(){
-                        match role.kind{
-                            RoleKind::Group(set) => {
-                                // If drop funder is on council
-                                if set.contains(&AccountId::try_from(member.to_string()).unwrap()){
-                                    user_roles.push(role.name.clone());
-                                }
-                            }
-                            RoleKind::Member(weight) => {
-                                // If drop funder is on council
-                                if weight > near_sdk::json_types::U128(0) {
-                                    user_roles.push(role.name.clone());
-                                }
-                            }
-                            RoleKind::Everyone => {
-                                user_roles.push(role.name.clone());
-                            }
-                            
-                        }
-                    }
-                    log!("USER ROLES: {:?}", user_roles);
-                    user_roles
-            } else {
-                env::panic_str("ERR_WRONG_VAL_RECEIVED")
-            }
-        },
-        PromiseResult::Failed => env::panic_str("ERR_CALL_FAILED"),
-        } 
-    }
-
-    pub fn test(proposal: ProposalInput) {
-        // Check if ProposalInput object can be made from input proposal
-        // let prop: ProposalInput = near_sdk::serde_json::from_str(&proposal).expect("Not valid SaleArgs");
-        log!("I made it here!");
-        log!("{:?}", proposal);
-        log!("Breaking it all apart");
-        match proposal.kind{
-            ProposalKind::AddMemberToRole { member_id, role } => {
-                log!("{}", role);
-                log!("{}", member_id);
-            }
-            _ => log!("NEITHER"),
-
-        };
-    }
     
     #[payable]
     #[private]
@@ -244,6 +185,9 @@ impl Contract {
                                 );
                                 
                             }
+                            else{
+                                log!("Funder is not council!");
+                            }
                         }
                         _ => (),
                     };
@@ -278,6 +222,51 @@ impl Contract {
                 log!("New Proposal Callback: Failed branch");
                 env::panic_str("ERR_CALL_FAILED");
             }
+        } 
+    }
+
+    pub fn view_user_roles(dao_contract: String, member: String) -> Promise{
+        ext_dao::ext(AccountId::try_from(dao_contract.to_string()).unwrap())
+        .get_policy()
+        .then(
+            Self::ext(env::current_account_id())
+            .view_user_roles_callback(member)
+        )
+    }
+
+    pub fn view_user_roles_callback(member: String) -> Vec<String>{
+        let mut user_roles = Vec::new();
+        match env::promise_result(0) {
+            PromiseResult::NotReady => unreachable!(),
+            PromiseResult::Successful(val) => {
+                if let Ok(pol) = near_sdk::serde_json::from_slice::<Policy>(&val) {
+                    for role in pol.roles.into_iter(){
+                        match role.kind{
+                            RoleKind::Group(set) => {
+                                // If drop funder is on council
+                                if set.contains(&AccountId::try_from(member.to_string()).unwrap()){
+                                    user_roles.push(role.name.clone());
+                                }
+                            }
+                            RoleKind::Member(weight) => {
+                                // If drop funder is on council
+                                if weight > near_sdk::json_types::U128(0) {
+                                    user_roles.push(role.name.clone());
+                                }
+                            }
+                            RoleKind::Everyone => {
+                                user_roles.push(role.name.clone());
+                            }
+                            
+                        }
+                    }
+                    log!("USER ROLES: {:?}", user_roles);
+                    user_roles
+            } else {
+                env::panic_str("ERR_WRONG_VAL_RECEIVED")
+            }
+        },
+        PromiseResult::Failed => env::panic_str("ERR_CALL_FAILED"),
         } 
     }
 }
