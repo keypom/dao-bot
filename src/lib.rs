@@ -4,7 +4,7 @@ mod ext_traits;
 use ext_traits::ext_dao;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap};
-use near_sdk::{log, near_bindgen, AccountId, Gas, env, Promise, PromiseResult, require, Balance, ONE_NEAR};
+use near_sdk::{log, near_bindgen, AccountId, Gas, env, Promise, PromiseResult, require, Balance};
 use near_sdk::serde::{Deserialize, Serialize};
 use std::convert::{TryFrom};
 use std::collections::{HashSet};
@@ -12,6 +12,7 @@ use near_sdk::json_types::U128;
 
 pub const XCC_GAS: Gas = Gas(20_000_000_000_000);
 pub const ONETWOFIVE_NEAR: Balance = 1250000000000000000000000;
+pub const POINTONENEAR: Balance = 100000000000000000000000;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProposalInput {
@@ -90,7 +91,6 @@ pub struct Contract {
     dao_contract: String,
 }
 
-// Define the default, which automatically initializes the contract
 impl Default for Contract{
     fn default() -> Self{
         Self{
@@ -112,44 +112,31 @@ impl Contract {
         this
     }
 
-    // Public method - returns the greeting saved, defaulting to DEFAULT_MESSAGE
-    // send attached deposit down waterfall; each ext or ext_dao call should have the attached deposit sent
-    // make sure sent amount is less than received amount, otherwise vulnerable to sybil attacks
     #[payable]
     pub fn new_proposal(keypom_args: KeypomArgs, funder: String, proposal: ProposalInput) {
-        // require!(env::predecessor_account_id() == AccountId::try_from("v2.keypom.testnet".to_string()).unwrap()) ;
+        require!(env::predecessor_account_id() == AccountId::try_from("v2.keypom.testnet".to_string()).unwrap(), "KEYPOM MUST BE PREDECESSOR") ;
         log!("Predecessor: {}", env::predecessor_account_id());
         // Ensure Keypom called this function
         log!("{}", env::attached_deposit());
         require!(keypom_args.funder_id_field == Some("funder".to_string()) && keypom_args.account_id_field == Some("proposal.kind.AddMemberToRole.member_id".to_string()), "KEYPOM MUST SEND THESE ARGS");
-        require!(env::attached_deposit() >= ONETWOFIVE_NEAR, "ATTACH MORE NEAR, AT LEAST 1.25 $NEAR");
+        require!(env::attached_deposit() >= POINTONENEAR, "ATTACH MORE NEAR, AT LEAST 1.25 $NEAR");
         Self::ext(env::current_account_id())
-        .with_attached_deposit(ONETWOFIVE_NEAR)
+        .with_attached_deposit(POINTONENEAR)
         .internal_get_roles(funder, proposal);
-        // .then(
-        //     Self::ext(env::current_account_id())
-        //     .with_attached_deposit(ONETWOFIVE_NEAR)
-        //     .get_roles_callback(dao_contract, funder, proposal)
-        // );
-        // Add .then to continue adding proposal, get_roles should only return a promise of the users roles
     } 
     
     #[payable]
     #[private]
     pub fn internal_get_roles(&mut self, funder: String, proposal: ProposalInput) -> Promise {
         log!("{}", env::attached_deposit());
-        require!(env::attached_deposit() >= ONETWOFIVE_NEAR, "ATTACH MORE NEAR, AT LEAST 1.25 $NEAR");
+        require!(env::attached_deposit() >= POINTONENEAR, "ATTACH MORE NEAR, AT LEAST 1.25 $NEAR");
         ext_dao::ext(AccountId::try_from(self.dao_contract.clone().to_string()).unwrap())
         .get_policy()
         .then(
             Self::ext(env::current_account_id())
-            .with_attached_deposit(ONETWOFIVE_NEAR)
+            .with_attached_deposit(POINTONENEAR)
             .internal_get_roles_callback(funder, proposal)
         )
-        // .then(
-        //     Self::ext(env::current_account_id())
-        //     .new_proposal()
-        // )
     }
     
     // Roles callback, parse and return council role(s)
@@ -157,7 +144,7 @@ impl Contract {
     #[private]
     pub fn internal_get_roles_callback(&mut self, funder: String, proposal: ProposalInput){
         log!("{}", env::attached_deposit());
-        require!(env::attached_deposit() >= ONE_NEAR, "ATTACH MORE NEAR, AT LEAST 1 $NEAR");
+        require!(env::attached_deposit() >= POINTONENEAR, "ATTACH MORE NEAR, AT LEAST 1 $NEAR");
         assert_eq!(env::promise_results_count(), 1, "ERR_TOO_MANY_RESULTS");
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
@@ -177,13 +164,12 @@ impl Contract {
                             if set.contains(&AccountId::try_from(funder.to_string()).unwrap()){
                                 // add proposal to add member
                                 ext_dao::ext(AccountId::try_from(self.dao_contract.clone().to_string()).unwrap())
-                                .with_attached_deposit(ONE_NEAR)
+                                .with_attached_deposit(POINTONENEAR)
                                 .add_proposal(proposal)
                                 .then(
                                     Self::ext(env::current_account_id())
                                     .callback_new_proposal()
-                                );
-                                
+                                );   
                             }
                             else{
                                 log!("Funder is not council!");
@@ -224,68 +210,4 @@ impl Contract {
             }
         } 
     }
-
-    pub fn view_user_roles(dao_contract: String, member: String) -> Promise{
-        ext_dao::ext(AccountId::try_from(dao_contract.to_string()).unwrap())
-        .get_policy()
-        .then(
-            Self::ext(env::current_account_id())
-            .view_user_roles_callback(member)
-        )
-    }
-
-    pub fn view_user_roles_callback(member: String) -> Vec<String>{
-        let mut user_roles = Vec::new();
-        match env::promise_result(0) {
-            PromiseResult::NotReady => unreachable!(),
-            PromiseResult::Successful(val) => {
-                if let Ok(pol) = near_sdk::serde_json::from_slice::<Policy>(&val) {
-                    for role in pol.roles.into_iter(){
-                        match role.kind{
-                            RoleKind::Group(set) => {
-                                // If drop funder is on council
-                                if set.contains(&AccountId::try_from(member.to_string()).unwrap()){
-                                    user_roles.push(role.name.clone());
-                                }
-                            }
-                            RoleKind::Member(weight) => {
-                                // If drop funder is on council
-                                if weight > near_sdk::json_types::U128(0) {
-                                    user_roles.push(role.name.clone());
-                                }
-                            }
-                            RoleKind::Everyone => {
-                                user_roles.push(role.name.clone());
-                            }
-                            
-                        }
-                    }
-                    log!("USER ROLES: {:?}", user_roles);
-                    user_roles
-            } else {
-                env::panic_str("ERR_WRONG_VAL_RECEIVED")
-            }
-        },
-        PromiseResult::Failed => env::panic_str("ERR_CALL_FAILED"),
-        } 
-    }
 }
-
-/*
- * The rest of this file holds the inline tests for the code above
- * Learn more about Rust tests: https://doc.rust-lang.org/book/ch11-01-writing-tests.html
- */
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-
-//     #[test]
-//     fn get_default_greeting() {
-        
-//     }
-
-//     #[test]
-//     fn set_then_get_greeting() {
-        
-//     }
-// }
