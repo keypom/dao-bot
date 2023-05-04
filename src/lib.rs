@@ -87,7 +87,6 @@ pub enum Action {
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Contract {
-    drop_id_archive: Option<LookupMap<u128, u64>>,
     dao_contract: String,
 }
 
@@ -95,7 +94,6 @@ impl Default for Contract{
     fn default() -> Self{
         Self{
             dao_contract: "".to_string(),
-            drop_id_archive: None
         }
     }
 }
@@ -107,7 +105,6 @@ impl Contract {
     pub fn new(dao_contract: String) -> Self{
         let this = Self {
             dao_contract,
-            drop_id_archive: None
         };
         this
     }
