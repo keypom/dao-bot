@@ -119,7 +119,8 @@ impl Contract {
         // Ensure Keypom called this function
         log!("{}", env::attached_deposit());
         require!(keypom_args.funder_id_field == Some("funder".to_string()) && keypom_args.account_id_field == Some("proposal.kind.AddMemberToRole.member_id".to_string()), "KEYPOM MUST SEND THESE ARGS");
-        require!(env::attached_deposit() >= POINTONENEAR, "ATTACH MORE NEAR, AT LEAST 1.25 $NEAR");
+        // With test cases, this needs to be at least 1 $NEAR
+        require!(env::attached_deposit() >= POINTONENEAR, "ATTACH MORE NEAR, AT LEAST 0.1 $NEAR");
         Self::ext(env::current_account_id())
         .with_attached_deposit(POINTONENEAR)
         .internal_get_roles(funder, proposal);
@@ -129,7 +130,8 @@ impl Contract {
     #[private]
     pub fn internal_get_roles(&mut self, funder: String, proposal: ProposalInput) -> Promise {
         log!("{}", env::attached_deposit());
-        require!(env::attached_deposit() >= POINTONENEAR, "ATTACH MORE NEAR, AT LEAST 1.25 $NEAR");
+        // With test cases, this needs to be at least 1 $NEAR
+        require!(env::attached_deposit() >= POINTONENEAR, "ATTACH MORE NEAR, AT LEAST 0.1 $NEAR");
         ext_dao::ext(AccountId::try_from(self.dao_contract.clone().to_string()).unwrap())
         .get_policy()
         .then(
@@ -144,7 +146,8 @@ impl Contract {
     #[private]
     pub fn internal_get_roles_callback(&mut self, funder: String, proposal: ProposalInput){
         log!("{}", env::attached_deposit());
-        require!(env::attached_deposit() >= POINTONENEAR, "ATTACH MORE NEAR, AT LEAST 1 $NEAR");
+        // With test cases, this needs to be at least 1 $NEAR
+        require!(env::attached_deposit() >= POINTONENEAR, "ATTACH MORE NEAR, AT LEAST 0.1 $NEAR");
         assert_eq!(env::promise_results_count(), 1, "ERR_TOO_MANY_RESULTS");
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
