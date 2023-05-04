@@ -4,15 +4,14 @@ mod ext_traits;
 use ext_traits::ext_dao;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap};
-use near_sdk::{log, near_bindgen, AccountId, Gas, env, Promise, PromiseResult, require, Balance};
+use near_sdk::{log, near_bindgen, AccountId, Gas, env, Promise, PromiseResult, require, Balance, ONE_NEAR};
 use near_sdk::serde::{Deserialize, Serialize};
 use std::convert::{TryFrom};
 use std::collections::{HashSet};
 use near_sdk::json_types::U128;
 
 pub const XCC_GAS: Gas = Gas(20_000_000_000_000);
-pub const ONETWOFIVE_NEAR: Balance = 1250000000000000000000000;
-pub const POINTONENEAR: Balance = 100000000000000000000000;
+pub const SPUTNIK_PROPOSAL_DEPOSIT: Balance = 100000000000000000000000;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProposalInput {
@@ -88,12 +87,14 @@ pub enum Action {
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Contract {
     dao_contract: String,
+    keypom_contract: String
 }
 
 impl Default for Contract{
     fn default() -> Self{
         Self{
             dao_contract: "".to_string(),
+            keypom_contract: "".to_string()
         }
     }
 }
@@ -105,46 +106,34 @@ impl Contract {
     pub fn new(dao_contract: String) -> Self{
         let this = Self {
             dao_contract,
+            keypom_contract: "v2.keypom.testnet".to_string()
         };
         this
     }
 
     #[payable]
-    pub fn new_proposal(keypom_args: KeypomArgs, funder: String, proposal: ProposalInput) {
+    pub fn new_proposal(&mut self, keypom_args: KeypomArgs, funder: String, proposal: ProposalInput) {
+        // Ensure Keypom called this function 
+        // When running ava test script, comment out predecessor check. Otherwise, will fail
         require!(env::predecessor_account_id() == AccountId::try_from("v2.keypom.testnet".to_string()).unwrap(), "KEYPOM MUST BE PREDECESSOR") ;
-        log!("Predecessor: {}", env::predecessor_account_id());
-        // Ensure Keypom called this function
-        log!("{}", env::attached_deposit());
         require!(keypom_args.funder_id_field == Some("funder".to_string()) && keypom_args.account_id_field == Some("proposal.kind.AddMemberToRole.member_id".to_string()), "KEYPOM MUST SEND THESE ARGS");
-        // With test cases, this needs to be at least 1 $NEAR
-        require!(env::attached_deposit() >= POINTONENEAR, "ATTACH MORE NEAR, AT LEAST 0.1 $NEAR");
-        Self::ext(env::current_account_id())
-        .with_attached_deposit(POINTONENEAR)
-        .internal_get_roles(funder, proposal);
-    } 
-    
-    #[payable]
-    #[private]
-    pub fn internal_get_roles(&mut self, funder: String, proposal: ProposalInput) -> Promise {
-        log!("{}", env::attached_deposit());
-        // With test cases, this needs to be at least 1 $NEAR
-        require!(env::attached_deposit() >= POINTONENEAR, "ATTACH MORE NEAR, AT LEAST 0.1 $NEAR");
+        
+        // Ensure enough attached deposit was added to add the proposal
+        require!(env::attached_deposit() >= SPUTNIK_PROPOSAL_DEPOSIT, "ATTACH MORE NEAR, AT LEAST 0.1 $NEAR");
+        
+        // Begin auto-registration
         ext_dao::ext(AccountId::try_from(self.dao_contract.clone().to_string()).unwrap())
         .get_policy()
         .then(
             Self::ext(env::current_account_id())
-            .with_attached_deposit(POINTONENEAR)
             .internal_get_roles_callback(funder, proposal)
-        )
-    }
+        );
+    } 
+
     
     // Roles callback, parse and return council role(s)
-    #[payable]
     #[private]
     pub fn internal_get_roles_callback(&mut self, funder: String, proposal: ProposalInput){
-        log!("{}", env::attached_deposit());
-        // With test cases, this needs to be at least 1 $NEAR
-        require!(env::attached_deposit() >= POINTONENEAR, "ATTACH MORE NEAR, AT LEAST 0.1 $NEAR");
         assert_eq!(env::promise_results_count(), 1, "ERR_TOO_MANY_RESULTS");
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
@@ -164,7 +153,7 @@ impl Contract {
                             if set.contains(&AccountId::try_from(funder.to_string()).unwrap()){
                                 // add proposal to add member
                                 ext_dao::ext(AccountId::try_from(self.dao_contract.clone().to_string()).unwrap())
-                                .with_attached_deposit(POINTONENEAR)
+                                .with_attached_deposit(SPUTNIK_PROPOSAL_DEPOSIT)
                                 .add_proposal(proposal)
                                 .then(
                                     Self::ext(env::current_account_id())
@@ -189,14 +178,13 @@ impl Contract {
     pub fn callback_new_proposal(&mut self) -> Promise{
         match env::promise_result(0) {
             PromiseResult::NotReady => {
-                log!("New Proposal Callback: NotReady");
                 unreachable!();
             },
             PromiseResult::Successful(val) => {
-                log!("New Proposal Callback: Successful");
                 if let Ok(proposal_id) = near_sdk::serde_json::from_slice::<u64>(&val) {
+                    // ensure only DAO bot can call this method
                     require!(env::predecessor_account_id() == env::current_account_id(), "ONLY DAO BOT MAY CALL THIS METHOD");
-                    log!("New Proposal Callback: ID Received and Predecessor Verified");
+                    
                     // Approve proposal that was just added 
                     ext_dao::ext(AccountId::try_from(self.dao_contract.clone().to_string()).unwrap())
                    .act_proposal(proposal_id, Action::VoteApprove, Some("Keypom DAO-Bot auto-registration".to_string()))
@@ -205,9 +193,25 @@ impl Contract {
                 }
             },
             PromiseResult::Failed => {
-                log!("New Proposal Callback: Failed branch");
                 env::panic_str("ERR_CALL_FAILED");
             }
         } 
     }
+
+    #[private]
+    pub fn change_keypom_contract(&mut self, new_contract: String){
+        self.keypom_contract = new_contract
+    }
+
+    pub fn view_keypom_contract(&self) -> String{
+        self.keypom_contract.clone()
+    }
+    pub fn view_dao_contract(&self) -> String{
+        self.dao_contract.clone()
+    }
+    
+
+
+
+
 }

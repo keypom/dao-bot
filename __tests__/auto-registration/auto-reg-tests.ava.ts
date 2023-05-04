@@ -3,6 +3,44 @@ import { BN, NEAR, NearAccount, Worker, getNetworkFromEnv } from "near-workspace
 import { CONTRACT_METADATA, displayFailureLog, generateKeyPairs, LARGE_GAS, queryAllViewFunctions, WALLET_GAS } from "../utils/general";
 import { DropConfig, FCData } from "../utils/types";
 
+
+
+type kind = {
+    Group?: String[];
+}
+
+
+type role = {
+    name: string;
+    kind: kind;
+};
+
+type policy = {
+    roles: role[];
+}
+
+// Parsing user roles
+function getUserRoles (policyInfo: policy, accountId: string) {
+    let roles: string[] = [];
+    roles.push('All')
+
+    // Loop through each element in res.roles
+    for (const role of policyInfo.roles) {
+        const roleKind = role.kind;
+        console.log('roleKind: ', roleKind)
+        const roleName = role.name;
+        console.log('roleName: ', roleName)
+
+        
+        console.log(roleKind.Group?.toString());
+        if (roleKind.Group?.includes(accountId)){
+            roles.push(roleName)
+        }
+    }
+
+    return roles
+}
+
 const test = anyTest as TestFn<{
     worker: Worker;
     accounts: Record<string, NearAccount>;
@@ -72,7 +110,7 @@ test.beforeEach(async (t) => {
             }
         },
         {gas: new BN(30 * 10**12),
-        attachedDeposit: NEAR.parse("1").toString()}
+        attachedDeposit: NEAR.parse("0.1").toString()}
     );
     
     await minqi.call(dao, 'act_proposal',
@@ -98,7 +136,7 @@ test.beforeEach(async (t) => {
             }
         },
         {gas: new BN(30 * 10**12),
-        attachedDeposit: NEAR.parse("1").toString()}
+        attachedDeposit: NEAR.parse("0.1").toString()}
     );
     
     await minqi.call(dao, 'act_proposal',
@@ -165,7 +203,7 @@ test('Malicious Actors with their own DAOs', async t => {
                             account_id_field: "proposal.kind.AddMemberToRole.member_id",
                         }
                     }),
-                    attached_deposit: NEAR.parse("1.5").toString()
+                    attached_deposit: NEAR.parse("0.1").toString()
                 }
             ],
             // method 2, let keypom populate keypom args but with existing values
@@ -188,7 +226,7 @@ test('Malicious Actors with their own DAOs', async t => {
                     }),
                     funder_id_field: "funder",
                     account_id_field: "proposal.kind.AddMemberToRole.member_id",
-                    attached_deposit: NEAR.parse("1.5").toString()
+                    attached_deposit: NEAR.parse("0.1").toString()
                 }
             ],
         ]   
@@ -208,8 +246,11 @@ test('Malicious Actors with their own DAOs', async t => {
     await keypom.call(keypom, 'claim', {account_id: member1.accountId}, {gas: WALLET_GAS});
     
     // Ensure DAO does not have member1 as an onboardee
-    let member1dao_groups: Array<String> = await minqi.call(daoBot, 'view_user_roles', {dao_contract: dao.accountId, member: member1.accountId});
+    let pol: policy = await dao.view('get_policy');
+    
+    let member1dao_groups: Array<String> = getUserRoles(pol, member1.accountId);
     t.is(member1dao_groups.includes('new-onboardee-role'), false);
+    // t.is(1==1, true);
 });
 
 // // PURPOSE: Ensure dao bot can only interact with intended dao
@@ -244,7 +285,7 @@ test('1 DAO 1 DAO Bot', async t => {
             }
         },
         {gas: new BN(30 * 10**12),
-        attachedDeposit: NEAR.parse("1").toString()}
+        attachedDeposit: NEAR.parse("0.1").toString()}
     );
     
     await member2.call(dao2, 'act_proposal',
@@ -270,7 +311,7 @@ test('1 DAO 1 DAO Bot', async t => {
             }
         },
         {gas: new BN(30 * 10**12),
-        attachedDeposit: NEAR.parse("1").toString()}
+        attachedDeposit: NEAR.parse("0.1").toString()}
     );
     
     await member2.call(dao2, 'act_proposal',
@@ -299,7 +340,7 @@ test('1 DAO 1 DAO Bot', async t => {
                     }),
                     funder_id_field: "funder",
                     account_id_field: "proposal.kind.AddMemberToRole.member_id",
-                    attached_deposit: NEAR.parse("1.5").toString()
+                    attached_deposit: NEAR.parse("0.1").toString()
                 }
             ],
         ]   
@@ -317,7 +358,10 @@ test('1 DAO 1 DAO Bot', async t => {
     await keypom.call(keypom, 'claim', {account_id: member1.accountId}, {gas: WALLET_GAS});
     
     // Ensure call to DAO2 did not go through 
-    let member1dao2_groups: Array<String> = await minqi.call(daoBot, 'view_user_roles', {dao_contract: dao2.accountId, member: member1.accountId});
+    let pol: policy = await dao.view('get_policy');
+    // let jsonPol = JSON.parse(pol)  
+    let member1dao2_groups: Array<String> = getUserRoles(pol, member1.accountId);
+    // t.is(1==1, true);
     t.is(!member1dao2_groups.includes('new-onboardee-role'), true);
 });
 
@@ -343,7 +387,7 @@ test('Normal Claiming Process', async t => {
                     }),
                     funder_id_field: "funder",
                     account_id_field: "proposal.kind.AddMemberToRole.member_id",
-                    attached_deposit: NEAR.parse("1.5").toString()
+                    attached_deposit: NEAR.parse("0.1").toString()
                 }
             ],
         ]   
@@ -359,46 +403,30 @@ test('Normal Claiming Process', async t => {
     await keypom.setKey(keys[0]);
     await keypom.call(keypom, 'claim', {account_id: member1.accountId}, {gas: WALLET_GAS});
     
-    let member1_groups: Array<String> = await minqi.call(daoBot, 'view_user_roles', {dao_contract: dao.accountId, member: member1.accountId});
+    let pol: policy = await dao.view('get_policy');
+    let member1_groups: Array<String> = getUserRoles(pol, member1.accountId);    
     t.is(member1_groups.includes('new-onboardee-role'), true);
+    // t.is(1==1, true);
 });
 
-//     const { keypom, dao, daoBot, minqi, member1, member2, member3 } = t.context.accounts;
+// // PURPOSE: Ensure Keypom contract stored on DAO bot can be changed but only by daoBot
+test('DAO Bot Keypom Contract State Variable Security', async t => {
+    const { daoBot, minqi } = t.context.accounts;
 
-//     const fcData: FCData = {
-//         methods: [
-//             [
-//                 {
-//                     receiver_id: daoBot.accountId,
-//                     method_name: "new_proposal",
-//                     args: JSON.stringify({
-//                         proposal: {
-//                             description: "mooooooooon",
-//                             kind: {
-//                                 AddMemberToRole:{
-//                                     role: "new-onboardee-role",
-//                                 }
-//                             }
-//                         },
-//                     }),
-//                     funder_id_field: "funder",
-//                     account_id_field: "proposal.kind.AddMemberToRole.member_id",
-//                     attached_deposit: NEAR.parse("1.5").toString()
-//                 }
-//             ],
-//         ]   
-//     }   
+    let keypomContract = await daoBot.view("view_keypom_contract");
+    t.is(keypomContract == "v2.keypom.testnet", true);
 
-//     const config: DropConfig = { 
-//         uses_per_key: 1
-//     }
+    // This should not work, try catch used to catch error and continue testing
+    try{
+        await minqi.call(daoBot, "change_keypom_contract", {new_contract: "abc.testnet"})
+    }
+    catch(err){
+        // verify it has not changed
+        t.is(keypomContract == "v2.keypom.testnet", true);
+    }
 
-//     let {keys, publicKeys} = await generateKeyPairs(1);
-//     await minqi.call(keypom, 'create_drop', {public_keys: publicKeys, deposit_per_use: NEAR.parse('1').toString(), fc: fcData, config}, {gas: LARGE_GAS, attachedDeposit: NEAR.parse('3').toString()});
-    
-//     await keypom.setKey(keys[0]);
-//     await keypom.call(keypom, 'claim', {account_id: member1.accountId}, {gas: WALLET_GAS});
-    
-//     let member1_groups: Array<String> = await minqi.call(daoBot, 'view_user_roles', {dao_contract: dao.accountId, member: member1.accountId});
-//     t.is(member1_groups.includes('new-onboardee-role'), true);
-// });
+    // This should work
+    await daoBot.call(daoBot, "change_keypom_contract", {new_contract: "v1-3.keypom.testnet"})
+    keypomContract = await daoBot.view("view_keypom_contract");
+    t.is(keypomContract == "v1-3.keypom.testnet", true);
+});
