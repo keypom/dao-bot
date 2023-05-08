@@ -3,14 +3,14 @@ mod ext_traits;
 
 use ext_traits::ext_dao;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::{LookupMap};
-use near_sdk::{log, near_bindgen, AccountId, Gas, env, Promise, PromiseResult, require, Balance, ONE_NEAR};
+use near_sdk::{log, near_bindgen, AccountId, Gas, env, Promise, PromiseResult, require, Balance};
 use near_sdk::serde::{Deserialize, Serialize};
 use std::convert::{TryFrom};
 use std::collections::{HashSet};
 use near_sdk::json_types::U128;
 
 pub const XCC_GAS: Gas = Gas(20_000_000_000_000);
+// 0.1 $NEAR
 pub const SPUTNIK_PROPOSAL_DEPOSIT: Balance = 100000000000000000000000;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -115,7 +115,7 @@ impl Contract {
     pub fn new_proposal(&mut self, keypom_args: KeypomArgs, funder: String, proposal: ProposalInput) {
         // Ensure Keypom called this function 
         // When running ava test script, comment out predecessor check. Otherwise, will fail
-        require!(env::predecessor_account_id() == AccountId::try_from("v2.keypom.testnet".to_string()).unwrap(), "KEYPOM MUST BE PREDECESSOR") ;
+        require!(env::predecessor_account_id() == AccountId::try_from(self.keypom_contract.clone()).unwrap(), "KEYPOM MUST BE PREDECESSOR");
         require!(keypom_args.funder_id_field == Some("funder".to_string()) && keypom_args.account_id_field == Some("proposal.kind.AddMemberToRole.member_id".to_string()), "KEYPOM MUST SEND THESE ARGS");
         
         // Ensure enough attached deposit was added to add the proposal
