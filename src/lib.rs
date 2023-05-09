@@ -124,6 +124,7 @@ impl Contract {
     // Roles callback, parse and return council role(s)
     #[private]
     pub fn internal_get_roles_callback(&mut self, funder: String, proposal: ProposalInput, dao_contract: String){
+        // Receive get_policy promise, parse it and see if funder is on DAO council
         assert_eq!(env::promise_results_count(), 1, "ERR_TOO_MANY_RESULTS");
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
@@ -137,11 +138,11 @@ impl Contract {
                     .nth(0)
                     .unwrap().kind;
 
+                    // See if funder is in Council group
                     match members{
                         RoleKind::Group(set) => {
-                            // If drop funder is on council
                             if set.contains(&AccountId::try_from(funder.to_string()).unwrap()){
-                                // add proposal to add member
+                                // Add proposal to register member if funder is on council
                                 ext_dao::ext(AccountId::try_from(dao_contract.clone().to_string()).unwrap())
                                 .with_attached_deposit(SPUTNIK_PROPOSAL_DEPOSIT)
                                 .add_proposal(proposal)
@@ -166,6 +167,7 @@ impl Contract {
     
     #[private]
     pub fn callback_new_proposal(&mut self, dao_contract: String) -> Promise{
+        // Get proposal ID from add_proposal promise
         match env::promise_result(0) {
             PromiseResult::NotReady => {
                 unreachable!();
