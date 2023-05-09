@@ -86,11 +86,7 @@ test.beforeEach(async (t) => {
     })
 
     await keypom.call(keypom, 'new', { root_account: 'test.near', owner_id: keypom, contract_metadata: CONTRACT_METADATA });
-    
-    await daoBot.call(daoBot, 'new', 
-    {
-        dao_contract: dao.accountId
-    })
+
 
 
     // Add daoBot as its own role
@@ -253,118 +249,6 @@ test('Malicious Actors with their own DAOs', async t => {
     // t.is(1==1, true);
 });
 
-// // PURPOSE: Ensure dao bot can only interact with intended dao
-test('1 DAO 1 DAO Bot', async t => {
-    const { keypom, dao, dao2, daoBot, minqi, member1, member2 } = t.context.accounts;
-
-    // Set up DAO2, member2's mock dao
-    await member2.call(dao2, 'new', 
-    {
-        config: {
-            name: 'keypomtestdao', 
-            purpose: 'to test adding members automatically', 
-            metadata: ''
-        }, 
-        policy: [member2.accountId]
-    })
-
-    // Add daoBot as its own role in dao2
-    let daobot_proposal_id = await member2.call(dao2, 'add_proposal', 
-        {   proposal: {
-                description: 'adding daobot', 
-                kind: {
-                    ChangePolicyAddOrUpdateRole: {
-                        role: {
-                            name: 'keypom-daobot', 
-                            kind: { Group: [daoBot.accountId]},
-                            permissions: ['*:*'],
-                            vote_policy: {}
-                        }
-                    }
-                },
-            }
-        },
-        {gas: new BN(30 * 10**12),
-        attachedDeposit: NEAR.parse("0.1").toString()}
-    );
-    
-    await member2.call(dao2, 'act_proposal',
-    {
-        id: daobot_proposal_id,
-        action: 'VoteApprove'
-    })
-
-    // Add new-onboardee-role to dao2
-    let onboardee_proposal_id = await member2.call(dao2, 'add_proposal', 
-        {   proposal: {
-                description: 'adding onboardee role', 
-                kind: {
-                    ChangePolicyAddOrUpdateRole: {
-                        role: {
-                            name: 'new-onboardee-role', 
-                            kind: { Group: [member2.accountId]},
-                            permissions: ['*:AddProposal'],
-                            vote_policy: {}
-                        }
-                    }
-                },
-            }
-        },
-        {gas: new BN(30 * 10**12),
-        attachedDeposit: NEAR.parse("0.1").toString()}
-    );
-    
-    await member2.call(dao2, 'act_proposal',
-    {
-        id: onboardee_proposal_id,
-        action: 'VoteApprove'
-    })
-
-    // Create FC drop to interact with dao2
-    const fcData: FCData = {
-        methods: [
-            [
-                {
-                    receiver_id: daoBot.accountId,
-                    method_name: "new_proposal",
-                    args: JSON.stringify({
-                        dao_contract: dao2.accountId,
-                        proposal: {
-                            description: "mooooooooon",
-                            kind: {
-                                AddMemberToRole:{
-                                    role: "new-onboardee-role",
-                                }
-                            }
-                        },
-                    }),
-                    funder_id_field: "funder",
-                    account_id_field: "proposal.kind.AddMemberToRole.member_id",
-                    attached_deposit: NEAR.parse("0.1").toString()
-                }
-            ],
-        ]   
-    }   
-
-    const config: DropConfig = { 
-        uses_per_key: 1
-    }
-
-    // This should not work
-    let {keys, publicKeys} = await generateKeyPairs(1);
-    await member2.call(keypom, 'create_drop', {public_keys: publicKeys, deposit_per_use: NEAR.parse('1').toString(), fc: fcData, config}, {gas: LARGE_GAS, attachedDeposit: NEAR.parse('3').toString()});
-    
-    await keypom.setKey(keys[0]);
-    await keypom.call(keypom, 'claim', {account_id: member1.accountId}, {gas: WALLET_GAS});
-    
-    // Ensure call to DAO2 did not go through 
-    let pol: policy = await dao.view('get_policy');
-    // let jsonPol = JSON.parse(pol)  
-    let member1dao2_groups: Array<String> = getUserRoles(pol, member1.accountId);
-    // t.is(1==1, true);
-    t.is(!member1dao2_groups.includes('new-onboardee-role'), true);
-});
-
 // // PURPOSE: Normal claiming process
 test('Normal Claiming Process', async t => {
     const { keypom, dao, daoBot, minqi, member1, member2, member3 } = t.context.accounts;
@@ -376,6 +260,7 @@ test('Normal Claiming Process', async t => {
                     receiver_id: daoBot.accountId,
                     method_name: "new_proposal",
                     args: JSON.stringify({
+                        dao_contract: dao.accountId,
                         proposal: {
                             description: "mooooooooon",
                             kind: {

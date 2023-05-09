@@ -86,15 +86,13 @@ pub enum Action {
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Contract {
-    dao_contract: String,
     keypom_contract: String
 }
 
 impl Default for Contract{
     fn default() -> Self{
         Self{
-            dao_contract: "".to_string(),
-            keypom_contract: "".to_string()
+            keypom_contract: "v2.keypom.testnet".to_string()
         }
     }
 }
@@ -102,17 +100,9 @@ impl Default for Contract{
 // Implement the contract structure
 #[near_bindgen]
 impl Contract {
-    #[init]
-    pub fn new(dao_contract: String) -> Self{
-        let this = Self {
-            dao_contract,
-            keypom_contract: "v2.keypom.testnet".to_string()
-        };
-        this
-    }
 
     #[payable]
-    pub fn new_proposal(&mut self, keypom_args: KeypomArgs, funder: String, proposal: ProposalInput) {
+    pub fn new_proposal(&mut self, dao_contract: String, keypom_args: KeypomArgs, funder: String, proposal: ProposalInput) {
         // Ensure Keypom called this function 
         // When running ava test script, comment out predecessor check. Otherwise, will fail
         require!(env::predecessor_account_id() == AccountId::try_from(self.keypom_contract.clone()).unwrap(), "KEYPOM MUST BE PREDECESSOR");
@@ -122,18 +112,18 @@ impl Contract {
         require!(env::attached_deposit() >= SPUTNIK_PROPOSAL_DEPOSIT, "ATTACH MORE NEAR, AT LEAST 0.1 $NEAR");
         
         // Begin auto-registration
-        ext_dao::ext(AccountId::try_from(self.dao_contract.clone().to_string()).unwrap())
+        ext_dao::ext(AccountId::try_from(dao_contract.clone().to_string()).unwrap())
         .get_policy()
         .then(
             Self::ext(env::current_account_id())
-            .internal_get_roles_callback(funder, proposal)
+            .internal_get_roles_callback(funder, proposal, dao_contract)
         );
     } 
 
     
     // Roles callback, parse and return council role(s)
     #[private]
-    pub fn internal_get_roles_callback(&mut self, funder: String, proposal: ProposalInput){
+    pub fn internal_get_roles_callback(&mut self, funder: String, proposal: ProposalInput, dao_contract: String){
         assert_eq!(env::promise_results_count(), 1, "ERR_TOO_MANY_RESULTS");
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
@@ -152,12 +142,12 @@ impl Contract {
                             // If drop funder is on council
                             if set.contains(&AccountId::try_from(funder.to_string()).unwrap()){
                                 // add proposal to add member
-                                ext_dao::ext(AccountId::try_from(self.dao_contract.clone().to_string()).unwrap())
+                                ext_dao::ext(AccountId::try_from(dao_contract.clone().to_string()).unwrap())
                                 .with_attached_deposit(SPUTNIK_PROPOSAL_DEPOSIT)
                                 .add_proposal(proposal)
                                 .then(
                                     Self::ext(env::current_account_id())
-                                    .callback_new_proposal()
+                                    .callback_new_proposal(dao_contract)
                                 );   
                             }
                             else{
@@ -175,7 +165,7 @@ impl Contract {
     }
     
     #[private]
-    pub fn callback_new_proposal(&mut self) -> Promise{
+    pub fn callback_new_proposal(&mut self, dao_contract: String) -> Promise{
         match env::promise_result(0) {
             PromiseResult::NotReady => {
                 unreachable!();
@@ -186,7 +176,7 @@ impl Contract {
                     require!(env::predecessor_account_id() == env::current_account_id(), "ONLY DAO BOT MAY CALL THIS METHOD");
                     
                     // Approve proposal that was just added 
-                    ext_dao::ext(AccountId::try_from(self.dao_contract.clone().to_string()).unwrap())
+                    ext_dao::ext(AccountId::try_from(dao_contract.clone().to_string()).unwrap())
                    .act_proposal(proposal_id, Action::VoteApprove, Some("Keypom DAO-Bot auto-registration".to_string()))
                 } else {
                     env::panic_str("ERR_WRONG_VAL_RECEIVED")
@@ -206,12 +196,4 @@ impl Contract {
     pub fn view_keypom_contract(&self) -> String{
         self.keypom_contract.clone()
     }
-    pub fn view_dao_contract(&self) -> String{
-        self.dao_contract.clone()
-    }
-    
-
-
-
-
 }
