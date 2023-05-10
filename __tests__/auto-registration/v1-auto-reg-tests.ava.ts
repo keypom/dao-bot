@@ -62,12 +62,12 @@ test.beforeEach(async (t) => {
     // Creating dao member accounts
     const minqi = await root.createSubAccount('minqi');
     const member1 = await root.createSubAccount('member1');
-    const member2 = await root.createSubAccount('member2');
+    const maliciousActor = await root.createSubAccount('maliciousactor');
 
     // Deploy all 3 contracts
     const keypom = await root.devDeploy(`./__tests__/ext_wasm/keypom.wasm`);
     const dao = await root.devDeploy(`./__tests__/ext_wasm/sputnikdao2.wasm`);
-    const dao2 = await root.devDeploy(`./__tests__/ext_wasm/sputnikdao2.wasm`);
+    const daoMalicious = await root.devDeploy(`./__tests__/ext_wasm/sputnikdao2.wasm`);
     const daoBot = await root.devDeploy(`./out/dao_bot_v1.wasm`);
 
     console.log(`KEYPOM: ${keypom.accountId}`);
@@ -149,7 +149,7 @@ test.beforeEach(async (t) => {
 
     // Save state for test runs
     t.context.worker = worker;
-    t.context.accounts = { root, keypom, dao, dao2, daoBot, minqi, member1, member2 };
+    t.context.accounts = { root, keypom, dao, daoMalicious, daoBot, minqi, member1, maliciousActor };
 });
 
 // If the environment is reused, use test.after to replace test.afterEach
@@ -161,17 +161,17 @@ test.afterEach(async t => {
 
 // PURPOSE: Ensure malicious actors with their own daos cannot gain access to someone else's dao
 test('Malicious Actors with their own DAOs', async t => {
-    const { keypom, dao, dao2, daoBot, minqi, member1, member2 } = t.context.accounts;
+    const { keypom, dao, daoMalicious, daoBot, minqi, member1, maliciousActor } = t.context.accounts;
 
-    // Set up DAO2, member2's mock dao
-    await member2.call(dao2, 'new', 
+    // Set up daoMalicious, maliciousActor's mock dao
+    await maliciousActor.call(daoMalicious, 'new', 
     {
         config: {
             name: 'keypomtestdao', 
             purpose: 'to test adding members automatically', 
             metadata: ''
         }, 
-        policy: [member2.accountId]
+        policy: [maliciousActor.accountId]
     })
 
     // Create malicious FC drop attempting to gain access to dao. None of these should work
@@ -189,7 +189,7 @@ test('Malicious Actors with their own DAOs', async t => {
                             kind: {
                                 AddMemberToRole:{
                                     role: "new-onboardee-role",
-                                    member_id: member2.accountId
+                                    member_id: maliciousActor.accountId
                                 }
                             }
                         },
@@ -214,7 +214,7 @@ test('Malicious Actors with their own DAOs', async t => {
                             kind: {
                                 AddMemberToRole:{
                                     role: "new-onboardee-role",
-                                    member_id: member2.accountId
+                                    member_id: maliciousActor.accountId
                                 }
                             }
                         },
@@ -234,7 +234,7 @@ test('Malicious Actors with their own DAOs', async t => {
 
     // This should not work
     let {keys, publicKeys} = await generateKeyPairs(1);
-    await member2.call(keypom, 'create_drop', {public_keys: publicKeys, deposit_per_use: NEAR.parse('1').toString(), fc: fcData, config}, {gas: LARGE_GAS, attachedDeposit: NEAR.parse('5.5').toString()});
+    await maliciousActor.call(keypom, 'create_drop', {public_keys: publicKeys, deposit_per_use: NEAR.parse('1').toString(), fc: fcData, config}, {gas: LARGE_GAS, attachedDeposit: NEAR.parse('5.5').toString()});
     
     // claim both uses to test both methods
     await keypom.setKey(keys[0]);
@@ -251,7 +251,7 @@ test('Malicious Actors with their own DAOs', async t => {
 
 // // PURPOSE: Normal claiming process
 test('Normal Claiming Process', async t => {
-    const { keypom, dao, daoBot, minqi, member1, member2, member3 } = t.context.accounts;
+    const { keypom, dao, daoBot, minqi, member1, maliciousActor, member3 } = t.context.accounts;
 
     const fcData: FCData = {
         methods: [
