@@ -68,7 +68,7 @@ test.beforeEach(async (t) => {
     const keypom = await root.devDeploy(`./__tests__/ext_wasm/keypom.wasm`);
     const dao = await root.devDeploy(`./__tests__/ext_wasm/sputnikdao2.wasm`);
     const dao2 = await root.devDeploy(`./__tests__/ext_wasm/sputnikdao2.wasm`);
-    const daoBot = await root.devDeploy(`./v1/target/wasm32-unknown-unknown/release/dao_bot_v1.wasm`);
+    const daoBot = await root.devDeploy(`./out/dao_bot_v1.wasm`);
 
     console.log(`KEYPOM: ${keypom.accountId}`);
     console.log(`DAO: ${dao.accountId}`);
