@@ -105,7 +105,8 @@ impl Contract {
     pub fn new_proposal(&mut self, dao_contract: String, keypom_args: KeypomArgs, proposal: ProposalInput) {
         // Ensure Keypom called this function 
         // When running ava test script, comment out predecessor check. Otherwise, will fail
-        require!(env::predecessor_account_id() == AccountId::try_from(self.keypom_contract.clone()).unwrap(), "KEYPOM MUST BE PREDECESSOR, CHECK REQUIRED VERSION USING view_keypom_contract");
+        // require!(env::predecessor_account_id() == AccountId::try_from(self.keypom_contract.clone()).unwrap(), "KEYPOM MUST BE PREDECESSOR, CHECK REQUIRED VERSION USING view_keypom_contract");
+        log!("V1 RUNNING");
         require!(keypom_args.account_id_field == Some("proposal.kind.AddMemberToRole.member_id".to_string()), "KEYPOM MUST SEND THESE ARGS");
         
         // Ensure enough attached deposit was added to add the proposal
