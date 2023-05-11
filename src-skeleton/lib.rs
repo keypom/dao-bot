@@ -102,13 +102,13 @@ impl Contract {
 
     // Create new proposal, and call callback to receive proposal ID
     #[payable]
-    pub fn new_proposal(&mut self, dao_contract: String, keypom_args: KeypomArgs, proposal: ProposalInput) {
+    pub fn new_auto_registration(&mut self, dao_contract: String, keypom_args: KeypomArgs, proposal: ProposalInput) {
         
     } 
 
     // Receive proposal ID, approve proposal
     #[private]
-    pub fn callback_new_proposal(&mut self, dao_contract: String) -> Promise{
+    pub fn callback_new_auto_registration(&mut self, dao_contract: String) -> Promise{
         
     }
 

@@ -101,9 +101,8 @@ impl Default for Contract{
 impl Contract {
 
     #[payable]
-    pub fn new_proposal(&mut self, dao_contract: String, keypom_args: KeypomArgs, proposal: ProposalInput) {
+    pub fn new_auto_registration(&mut self, dao_contract: String, keypom_args: KeypomArgs, proposal: ProposalInput) {
         // Ensure Keypom called this function 
-        // When running ava test script, comment out predecessor check. Otherwise, will fail
         // require!(env::predecessor_account_id() == AccountId::try_from(self.keypom_contract.clone()).unwrap(), "KEYPOM MUST BE PREDECESSOR, CHECK REQUIRED VERSION USING view_keypom_contract");
         log!("V1 RUNNING");
         require!(keypom_args.account_id_field == Some("proposal.kind.AddMemberToRole.member_id".to_string()), "KEYPOM MUST SEND THESE ARGS");
@@ -117,13 +116,13 @@ impl Contract {
         .add_proposal(proposal)
         .then(
             Self::ext(env::current_account_id())
-            .callback_new_proposal(dao_contract)
+            .callback_new_auto_registration(dao_contract)
         );
     } 
 
     
     #[private]
-    pub fn callback_new_proposal(&mut self, dao_contract: String) -> Promise{
+    pub fn callback_new_auto_registration(&mut self, dao_contract: String) -> Promise{
         // Get proposal ID from add_proposal promise
         match env::promise_result(0) {
             PromiseResult::NotReady => {

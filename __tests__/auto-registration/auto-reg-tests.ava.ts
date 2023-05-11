@@ -68,7 +68,7 @@ test.beforeEach(async (t) => {
     const keypom = await root.devDeploy(`./__tests__/ext_wasm/keypom.wasm`);
     const dao = await root.devDeploy(`./__tests__/ext_wasm/sputnikdao2.wasm`);
     const daoMalicious = await root.devDeploy(`./__tests__/ext_wasm/sputnikdao2.wasm`);
-    const daoBot = await root.devDeploy(`./out/dao_bot.wasm`);
+    const daoBot = await root.devDeploy(`./testing-wasms/dao_bot.wasm`);
 
     console.log(`KEYPOM: ${keypom.accountId}`);
     console.log(`DAO: ${dao.accountId}`);
@@ -181,7 +181,7 @@ test('Malicious Actors with their own DAOs', async t => {
             [
                 {
                     receiver_id: daoBot.accountId,
-                    method_name: "new_proposal",
+                    method_name: "new_auto_registration",
                     args: JSON.stringify({
                         dao_contract: dao.accountId,
                         proposal: {
@@ -206,7 +206,7 @@ test('Malicious Actors with their own DAOs', async t => {
             [
                 {
                     receiver_id: daoBot.accountId,
-                    method_name: "new_proposal",
+                    method_name: "new_auto_registration",
                     args: JSON.stringify({
                         dao_contract: dao.accountId,
                         proposal: {
@@ -258,7 +258,7 @@ test('Normal Claiming Process', async t => {
             [
                 {
                     receiver_id: daoBot.accountId,
-                    method_name: "new_proposal",
+                    method_name: "new_auto_registration",
                     args: JSON.stringify({
                         dao_contract: dao.accountId,
                         proposal: {
