@@ -87,7 +87,7 @@ pub struct Contract {
 impl Default for Contract{
     fn default() -> Self{
         Self{
-            keypom_contract: AccountId::try_from("v2.keypom.near".to_string()).unwrap()
+            keypom_contract: AccountId::try_from("v2.keypom.testnet".to_string()).unwrap()
         }
     }
 }
@@ -184,8 +184,8 @@ impl Contract {
     }
 
     #[private]
-    pub fn change_keypom_contract(&mut self, new_contract: String){
-        self.keypom_contract = AccountId::try_from(new_contract).unwrap()
+    pub fn change_keypom_contract(&mut self, new_contract: AccountId){
+        self.keypom_contract = new_contract
     }
 
     pub fn view_keypom_contract(&self) -> AccountId{
