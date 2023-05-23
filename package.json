@@ -1,29 +1,26 @@
 {
-  "name": "boilerplate-template-rs",
+  "name": "dao-bot",
   "version": "1.0.0",
-  "license": "(MIT AND Apache-2.0)",
+  "description": "keypom dao bot, meant to only be called by keypom fc call. 1 dao bot per dao",
+  "main": "index.js",
+  "repository": "https://github.com/keypom/dao-bot.git",
+  "author": "Min Qian Lu <59981815+minqianlu@users.noreply.github.com>",
+  "license": "MIT",
   "scripts": {
-    "start": "cd frontend && npm run start",
-    "dev": "cd frontend && npm run dev",
-    "deploy": "cd contract && ./deploy.sh",
-    "build": "npm run build:contract && npm run build:frontend",
-    "build:frontend": "cd frontend && npm run build",
-    "build:contract": "cd contract && ./build.sh",
-    "test": "npm run test:unit && npm run test:integration",
-    "test:unit": "cd contract && cargo test",
-    "test:integration": "cd integration-tests && cargo run --example integration-tests \"../contract/target/wasm32-unknown-unknown/release/hello_near.wasm\"",
-    "postinstall": "cd frontend && npm install && cd .. && echo rs tests && echo rs contract",
-    "lint": "cd frontend && npm run lint",
-    "prettier:check": "cd frontend && npm run prettier:check",
-    "prepare": "husky install"
+    "test:auto-reg": "ava __tests__/auto-registration/auto-reg-tests.ava.ts",
+    "test:auto-reg-v1": "ava __tests__/auto-registration/v1-auto-reg-tests.ava.ts"
+  },
+  "dependencies": {
+    "crypto": "^1.0.1",
+    "gh-pages": "^4.0.0",
+    "keypom-js": "^1.4.9"
   },
   "devDependencies": {
-    "autoprefixer": "^10.4.13",
-    "husky": "^8.0.1",
-    "lint-staged": "^13.0.3",
-    "near-cli": "^3.3.0"
-  },
-  "lint-staged": {
-    "*/.{js,jsx,ts,tsx,css}": "prettier --write ."
+    "@types/bn.js": "^5.1.0",
+    "ava": "5.0.1",
+    "near-api-js": "^0.44.2",
+    "near-workspaces": "3.2.2",
+    "ts-node": "^10.8.0",
+    "typescript": "^4.6.4"
   }
 }
