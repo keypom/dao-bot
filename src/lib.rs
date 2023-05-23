@@ -91,7 +91,7 @@ pub struct Contract {
 impl Default for Contract{
     fn default() -> Self{
         Self{
-            keypom_contract: "v2.keypom.testnet".to_string()
+            keypom_contract: "v2.keypom.near".to_string()
         }
     }
 }
