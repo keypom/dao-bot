@@ -24,10 +24,6 @@ pub struct ProposalInput {
 pub enum ProposalKind {
     /// Add member to given role in the policy. This is short cut to updating the whole policy.
     AddMemberToRole { member_id: AccountId, role: String },
-    /// Remove member to given role in the policy. This is short cut to updating the whole policy.
-    RemoveMemberFromRole { member_id: AccountId, role: String },
-    /// Just a signaling vote, with no execution.
-    Vote,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
@@ -85,13 +81,13 @@ pub enum Action {
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Contract {
-    keypom_contract: String
+    keypom_contract: AccountId
 }
 
 impl Default for Contract{
     fn default() -> Self{
         Self{
-            keypom_contract: "v2.keypom.near".to_string()
+            keypom_contract: AccountId::try_from("v2.keypom.near".to_string()).unwrap()
         }
     }
 }
@@ -101,11 +97,13 @@ impl Default for Contract{
 impl Contract {
 
     #[payable]
-    pub fn new_auto_registration(&mut self, dao_contract: String, keypom_args: KeypomArgs, funder: String, proposal: ProposalInput) {
+    pub fn new_auto_registration(&mut self, dao_contract: AccountId, keypom_args: KeypomArgs, funder: AccountId, proposal: ProposalInput) {
         // Ensure Keypom called this function 
-        require!(env::predecessor_account_id() == AccountId::try_from(self.keypom_contract.clone()).unwrap(), "KEYPOM MUST BE PREDECESSOR, CHECK REQUIRED VERSION USING view_keypom_contract");
-        require!(keypom_args.funder_id_field == Some("funder".to_string()) && keypom_args.account_id_field == Some("proposal.kind.AddMemberToRole.member_id".to_string()), "KEYPOM MUST SEND THESE ARGS");
+        require!(env::predecessor_account_id() == self.keypom_contract.clone(), "KEYPOM MUST BE PREDECESSOR, CHECK REQUIRED VERSION USING view_keypom_contract");
         
+        // Note since ONLY AddMemberToRole defined from proposal.kind, any other proposal types will result in serialization error!
+        require!(keypom_args.funder_id_field == Some("funder".to_string()) && keypom_args.account_id_field == Some("proposal.kind.AddMemberToRole.member_id".to_string()), "KEYPOM MUST SEND THESE ARGS");
+
         // Ensure enough attached deposit was added to add the proposal
         require!(env::attached_deposit() >= SPUTNIK_PROPOSAL_DEPOSIT, "ATTACH MORE NEAR, AT LEAST 0.1 $NEAR");
         
@@ -121,7 +119,7 @@ impl Contract {
     
     // Roles callback, parse and return council role(s)
     #[private]
-    pub fn internal_get_roles_callback(&mut self, funder: String, proposal: ProposalInput, dao_contract: String){
+    pub fn internal_get_roles_callback(&mut self, funder: AccountId, proposal: ProposalInput, dao_contract: AccountId){
         // Receive get_policy promise, parse it and see if funder is on DAO council
         assert_eq!(env::promise_results_count(), 1, "ERR_TOO_MANY_RESULTS");
         match env::promise_result(0) {
@@ -164,17 +162,14 @@ impl Contract {
     }
     
     #[private]
-    pub fn callback_new_auto_registration(&mut self, dao_contract: String) -> Promise{
+    pub fn callback_new_auto_registration(&mut self, dao_contract: AccountId) -> Promise{
         // Get proposal ID from add_proposal promise
         match env::promise_result(0) {
             PromiseResult::NotReady => {
                 unreachable!();
             },
             PromiseResult::Successful(val) => {
-                if let Ok(proposal_id) = near_sdk::serde_json::from_slice::<u64>(&val) {
-                    // ensure only DAO bot can call this method
-                    require!(env::predecessor_account_id() == env::current_account_id(), "ONLY DAO BOT MAY CALL THIS METHOD");
-                    
+                if let Ok(proposal_id) = near_sdk::serde_json::from_slice::<u64>(&val) {                 
                     // Approve proposal that was just added 
                     ext_dao::ext(AccountId::try_from(dao_contract.clone().to_string()).unwrap())
                    .act_proposal(proposal_id, Action::VoteApprove, Some("Keypom DAO-Bot auto-registration".to_string()))
@@ -190,10 +185,10 @@ impl Contract {
 
     #[private]
     pub fn change_keypom_contract(&mut self, new_contract: String){
-        self.keypom_contract = new_contract
+        self.keypom_contract = AccountId::try_from(new_contract).unwrap()
     }
 
-    pub fn view_keypom_contract(&self) -> String{
+    pub fn view_keypom_contract(&self) -> AccountId{
         self.keypom_contract.clone()
     }
 }
