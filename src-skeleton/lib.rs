@@ -85,13 +85,13 @@ pub enum Action {
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Contract {
-    keypom_contract: String
+    keypom_contract: AccountId
 }
 
 impl Default for Contract{
     fn default() -> Self{
         Self{
-            keypom_contract: "v2.keypom.testnet".to_string()
+            keypom_contract: AccountId::try_from("v2.keypom.testnet".to_string()).unwrap()
         }
     }
 }
@@ -102,22 +102,22 @@ impl Contract {
 
     // Create new proposal, and call callback to receive proposal ID
     #[payable]
-    pub fn new_auto_registration(&mut self, dao_contract: String, keypom_args: KeypomArgs, proposal: ProposalInput) {
+    pub fn new_auto_registration(&mut self, dao_contract: AccountId, proposal: ProposalInput) {
         
     } 
 
     // Receive proposal ID, approve proposal
     #[private]
-    pub fn callback_new_auto_registration(&mut self, dao_contract: String) -> Promise{
+    pub fn callback_new_auto_registration(&mut self, dao_contract: AccountId) -> Promise{
         
     }
 
     #[private]
-    pub fn change_keypom_contract(&mut self, new_contract: String){
+    pub fn change_keypom_contract(&mut self, new_contract: AccountId){
         
     }
 
-    pub fn view_keypom_contract(&self) -> String{
+    pub fn view_keypom_contract(&self) -> AccountId{
         
     }
 }
