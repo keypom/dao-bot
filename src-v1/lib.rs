@@ -104,7 +104,7 @@ impl Contract {
     pub fn new_auto_registration(&mut self, dao_contract: AccountId, proposal: ProposalInput) {
         // Ensure Keypom called this function 
         log!("V1 RUNNING");
-        // require!(env::predecessor_account_id() == AccountId::try_from(self.keypom_contract.clone()).unwrap(), "KEYPOM MUST BE PREDECESSOR, CHECK REQUIRED VERSION USING view_keypom_contract");
+        require!(env::predecessor_account_id() == AccountId::try_from(self.keypom_contract.clone()).unwrap(), "KEYPOM MUST BE PREDECESSOR, CHECK REQUIRED VERSION USING view_keypom_contract");
         
         // Ensure enough attached deposit was added to add the proposal
         require!(env::attached_deposit() >= SPUTNIK_PROPOSAL_DEPOSIT, "ATTACH MORE NEAR, AT LEAST 0.1 $NEAR");
