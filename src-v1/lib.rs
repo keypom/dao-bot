@@ -85,13 +85,13 @@ pub enum Action {
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Contract {
-    keypom_contract: String
+    keypom_contract: AccountId
 }
 
 impl Default for Contract{
     fn default() -> Self{
         Self{
-            keypom_contract: "v2.keypom.testnet".to_string()
+            keypom_contract: AccountId::try_from("v2.keypom.testnet".to_string()).unwrap()
         }
     }
 }
@@ -101,17 +101,16 @@ impl Default for Contract{
 impl Contract {
 
     #[payable]
-    pub fn new_auto_registration(&mut self, dao_contract: String, keypom_args: KeypomArgs, proposal: ProposalInput) {
+    pub fn new_auto_registration(&mut self, dao_contract: AccountId, proposal: ProposalInput) {
         // Ensure Keypom called this function 
         log!("V1 RUNNING");
         require!(env::predecessor_account_id() == AccountId::try_from(self.keypom_contract.clone()).unwrap(), "KEYPOM MUST BE PREDECESSOR, CHECK REQUIRED VERSION USING view_keypom_contract");
-        require!(keypom_args.account_id_field == Some("proposal.kind.AddMemberToRole.member_id".to_string()), "KEYPOM MUST SEND THESE ARGS");
         
         // Ensure enough attached deposit was added to add the proposal
         require!(env::attached_deposit() >= SPUTNIK_PROPOSAL_DEPOSIT, "ATTACH MORE NEAR, AT LEAST 0.1 $NEAR");
         
         // Begin auto-registration
-        ext_dao::ext(AccountId::try_from(dao_contract.clone().to_string()).unwrap())
+        ext_dao::ext(dao_contract.clone())
         .with_attached_deposit(SPUTNIK_PROPOSAL_DEPOSIT)
         .add_proposal(proposal)
         .then(
@@ -122,7 +121,7 @@ impl Contract {
 
     
     #[private]
-    pub fn callback_new_auto_registration(&mut self, dao_contract: String) -> Promise{
+    pub fn callback_new_auto_registration(&mut self, dao_contract: AccountId) -> Promise{
         // Get proposal ID from add_proposal promise
         match env::promise_result(0) {
             PromiseResult::NotReady => {
@@ -130,11 +129,8 @@ impl Contract {
             },
             PromiseResult::Successful(val) => {
                 if let Ok(proposal_id) = near_sdk::serde_json::from_slice::<u64>(&val) {
-                    // ensure only DAO bot can call this method
-                    require!(env::predecessor_account_id() == env::current_account_id(), "ONLY DAO BOT MAY CALL THIS METHOD");
-                    
                     // Approve proposal that was just added 
-                    ext_dao::ext(AccountId::try_from(dao_contract.clone().to_string()).unwrap())
+                    ext_dao::ext(dao_contract.clone())
                    .act_proposal(proposal_id, Action::VoteApprove, Some("Keypom DAO-Bot auto-registration".to_string()))
                 } else {
                     env::panic_str("ERR_WRONG_VAL_RECEIVED")
@@ -147,11 +143,11 @@ impl Contract {
     }
 
     #[private]
-    pub fn change_keypom_contract(&mut self, new_contract: String){
+    pub fn change_keypom_contract(&mut self, new_contract: AccountId){
         self.keypom_contract = new_contract
     }
 
-    pub fn view_keypom_contract(&self) -> String{
+    pub fn view_keypom_contract(&self) -> AccountId{
         self.keypom_contract.clone()
     }
 }
