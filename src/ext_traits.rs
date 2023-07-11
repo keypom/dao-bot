@@ -15,6 +15,8 @@ trait ExtDao{
 #[ext_contract(ext_sbt_registry)]
 trait ExtSBTRegistry{
 
+    fn is_human(&self, account: AccountId) -> Vec<(AccountId, Vec<ClassId>)>;
+
     fn sbt_tokens_by_owner(&self, account: AccountId, issuer: Option<AccountId>, from_class: Option<u64>, limit: Option<u32>, with_expired: Option<bool>) -> Vec<(AccountId, Vec<OwnedToken>)>;
 }
 

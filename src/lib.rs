@@ -4,11 +4,13 @@ use ext_traits::{ext_dao, ext_sbt_registry};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{log, near_bindgen, AccountId, Gas, env, Promise, PromiseResult, require, Balance};
 use near_sdk::serde::{Deserialize, Serialize};
-use std::convert::{TryFrom};
-use std::collections::{HashSet};
+use std::convert::TryFrom;
+use std::collections::HashSet;
 use near_sdk::json_types::{U128, Base64VecU8};
 
 pub const XCC_GAS: Gas = Gas(20_000_000_000_000);
+pub const TGAS: u64 = 1_000_000_000_000;
+
 // 0.1 $NEAR
 pub const SPUTNIK_PROPOSAL_DEPOSIT: Balance = 100000000000000000000000;
 
@@ -132,7 +134,7 @@ impl Contract {
                 // If Proof-of-Humanity required, begin check
                 if human_only.unwrap_or(false) {
                     ext_sbt_registry::ext(AccountId::try_from("registry.i-am-human.near".to_string()).unwrap())
-                       .sbt_tokens_by_owner(member_id.clone(), None, None, None, None)
+                       .is_human(member_id.clone())
                        .then(
                             Self::ext(env::current_account_id())
                             .internal_human_check(funder, proposal, dao_contract)
@@ -155,43 +157,26 @@ impl Contract {
     #[private]
     pub fn internal_human_check(funder: AccountId, proposal: ProposalInput, dao_contract: AccountId) {
          // Parse Response and Check if Fractal is in owned tokens
-        assert_eq!(env::promise_results_count(), 1, "ERR_TOO_MANY_RESULTS");
-        match env::promise_result(0) {
-            PromiseResult::NotReady => unreachable!(),
-            PromiseResult::Successful(val) => {
-                if let Ok(owned_tokens) = near_sdk::serde_json::from_slice::<Vec<(AccountId, Vec<OwnedToken>)>>(&val) {
-                    let fractal_sbts = owned_tokens.into_iter()
-                    .filter(|token| token.0 == AccountId::try_from("fractal.i-am-human.near".to_string()).unwrap())
-                    .collect::<Vec<(AccountId, Vec<OwnedToken>)>>()
-                    .into_iter()
-                    // taking first and only fractal-i-am-human.near entry
-                    .nth(0)
-                    .unwrap_or((AccountId::try_from("somethingbad.near".to_string()).unwrap(), Vec::new()));
-
-                    if fractal_sbts.0 == AccountId::try_from("somethingbad.near".to_string()).unwrap(){
-                        env::panic_str("CLAIMING ACCOUNT MUST BE HUMAN")
-                    }
-
-                    // FOR NOW, validating by checking token class as only approving if class = 1
-                    // !ASSUMPTION! only 1 token from fractcal currently
-                    if fractal_sbts.1[0].metadata.class == 1{
-                        // Begin auto-registration
-                        ext_dao::ext(AccountId::try_from(dao_contract.clone().to_string()).unwrap())
-                        .get_policy()
-                        .then(
-                            Self::ext(env::current_account_id())
-                            .internal_get_roles_callback(funder, proposal, dao_contract)
-                        );
-                    }
-                    else{
-                        env::panic_str("SOMETHING WRONG WITH IAH FRACTAL TOKEN CLASS")
-                    }
-                } else {
-                 env::panic_str("ERR_WRONG_VAL_RECEIVED")
-                }
-            },
-            PromiseResult::Failed => env::panic_str("ERR_CALL_FAILED"),
-        } 
+        if let PromiseResult::Successful(val) = env::promise_result(0) {
+            if let Ok(proof) = near_sdk::serde_json::from_slice::<Vec<(AccountId, Vec<ClassId>)>>(&val) {
+                let mut human_tokens = proof.into_iter().peekable();
+                log!("New Human Check");
+                require!(human_tokens.peek().is_none() == false, "CLAIMING ACCOUNT MUST BE HUMAN");
+                
+                // Begin auto-registration
+                ext_dao::ext(AccountId::try_from(dao_contract.clone().to_string()).unwrap())
+                .get_policy()
+                .then(
+                    Self::ext(env::current_account_id())
+                    .internal_get_roles_callback(funder, proposal, dao_contract)
+                );
+            } else {
+             env::panic_str("ERR_WRONG_VAL_RECEIVED")
+            }      
+        }
+        else{
+            env::panic_str("PROBLEM WITH PROMISE")
+        }  
     }
 
     
@@ -199,10 +184,7 @@ impl Contract {
     #[private]
     pub fn internal_get_roles_callback(&mut self, funder: AccountId, proposal: ProposalInput, dao_contract: AccountId){
         // Receive get_policy promise, parse it and see if funder is on DAO council
-        assert_eq!(env::promise_results_count(), 1, "ERR_TOO_MANY_RESULTS");
-        match env::promise_result(0) {
-            PromiseResult::NotReady => unreachable!(),
-            PromiseResult::Successful(val) => {
+        if let PromiseResult::Successful(val) = env::promise_result(0) {
                 if let Ok(pol) = near_sdk::serde_json::from_slice::<Policy>(&val) {
                     // Trying to collect all roles with name council from policy
                     let members = pol.roles.into_iter()
@@ -234,31 +216,24 @@ impl Contract {
             } else {
                 env::panic_str("ERR_WRONG_VAL_RECEIVED")
             }
-        },
-        PromiseResult::Failed => env::panic_str("ERR_CALL_FAILED"),
         } 
     }
     
     #[private]
     pub fn callback_new_auto_registration(&mut self, dao_contract: AccountId) -> Promise{
         // Get proposal ID from add_proposal promise
-        match env::promise_result(0) {
-            PromiseResult::NotReady => {
-                unreachable!();
-            },
-            PromiseResult::Successful(val) => {
-                if let Ok(proposal_id) = near_sdk::serde_json::from_slice::<u64>(&val) {                 
-                    // Approve proposal that was just added 
-                    ext_dao::ext(AccountId::try_from(dao_contract.clone().to_string()).unwrap())
-                   .act_proposal(proposal_id, Action::VoteApprove, Some("Keypom DAO-Bot auto-registration".to_string()))
-                } else {
-                    env::panic_str("ERR_WRONG_VAL_RECEIVED")
-                }
-            },
-            PromiseResult::Failed => {
-                env::panic_str("ERR_CALL_FAILED");
+        if let PromiseResult::Successful(val) = env::promise_result(0) {
+            if let Ok(proposal_id) = near_sdk::serde_json::from_slice::<u64>(&val) {                 
+                // Approve proposal that was just added 
+                ext_dao::ext(AccountId::try_from(dao_contract.clone().to_string()).unwrap())
+               .act_proposal(proposal_id, Action::VoteApprove, Some("Keypom DAO BOT Auto-Registration".to_string()))
+            } else {
+                env::panic_str("ERR_WRONG_VAL_RECEIVED")
             }
         } 
+        else{
+            env::panic_str("PROBLEM WITH PROMISE")
+        }  
     }
 
     #[private]
