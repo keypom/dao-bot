@@ -1,14 +1,16 @@
 mod ext_traits;
 
-use ext_traits::ext_dao;
+use ext_traits::{ext_dao, ext_sbt_registry};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{log, near_bindgen, AccountId, Gas, env, Promise, PromiseResult, require, Balance};
 use near_sdk::serde::{Deserialize, Serialize};
-use std::convert::{TryFrom};
-use std::collections::{HashSet};
-use near_sdk::json_types::U128;
+use std::convert::TryFrom;
+use std::collections::HashSet;
+use near_sdk::json_types::{U128, Base64VecU8};
 
 pub const XCC_GAS: Gas = Gas(20_000_000_000_000);
+pub const TGAS: u64 = 1_000_000_000_000;
+
 // 0.1 $NEAR
 pub const SPUTNIK_PROPOSAL_DEPOSIT: Balance = 100000000000000000000000;
 
@@ -50,6 +52,24 @@ pub enum RoleKind {
     Group(HashSet<AccountId>),
 }
 
+#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+pub struct OwnedToken {
+    pub token: TokenId,
+    pub metadata: TokenMetadata,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+pub struct TokenMetadata {
+    pub class: ClassId,                      // token class
+    pub issued_at: Option<u64>, // When token was issued or minted, Unix epoch in milliseconds
+    pub expires_at: Option<u64>, // When token expires, Unix epoch in milliseconds
+    pub reference: Option<String>, // URL to an off-chain JSON file with more info.
+    pub reference_hash: Option<Base64VecU8>, // Base64-encoded sha256 hash of JSON from reference field. Required if `reference` is included.
+}
+
+pub type ClassId = u64;
+pub type TokenId = u64;
+
 /// Injected Keypom Args struct to be sent to external contracts
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Debug)]
 #[serde(crate = "near_sdk::serde")]
@@ -87,7 +107,7 @@ pub struct Contract {
 impl Default for Contract{
     fn default() -> Self{
         Self{
-            keypom_contract: AccountId::try_from("v2.keypom.testnet".to_string()).unwrap()
+            keypom_contract: AccountId::try_from("v2.keypom.near".to_string()).unwrap()
         }
     }
 }
@@ -97,7 +117,7 @@ impl Default for Contract{
 impl Contract {
 
     #[payable]
-    pub fn new_auto_registration(&mut self, dao_contract: AccountId, keypom_args: KeypomArgs, funder: AccountId, proposal: ProposalInput) {
+    pub fn new_auto_registration(&mut self, dao_contract: AccountId, keypom_args: KeypomArgs, funder: AccountId, proposal: ProposalInput, human_only: Option<bool>) {
         // Ensure Keypom called this function 
         require!(env::predecessor_account_id() == self.keypom_contract.clone(), "KEYPOM MUST BE PREDECESSOR, CHECK REQUIRED VERSION USING view_keypom_contract");
         
@@ -106,25 +126,65 @@ impl Contract {
 
         // Ensure enough attached deposit was added to add the proposal
         require!(env::attached_deposit() >= SPUTNIK_PROPOSAL_DEPOSIT, "ATTACH MORE NEAR, AT LEAST 0.1 $NEAR");
-        
-        // Begin auto-registration
-        ext_dao::ext(AccountId::try_from(dao_contract.clone().to_string()).unwrap())
-        .get_policy()
-        .then(
-            Self::ext(env::current_account_id())
-            .internal_get_roles_callback(funder, proposal, dao_contract)
-        );
+
+        // Ensure proposal kind is valid
+        match &proposal.kind{
+            // extract member ID here using match statement
+            ProposalKind::AddMemberToRole { member_id, role: _ } => {
+                // If Proof-of-Humanity required, begin check
+                if human_only.unwrap_or(false) {
+                    ext_sbt_registry::ext(AccountId::try_from("registry.i-am-human.near".to_string()).unwrap())
+                       .is_human(member_id.clone())
+                       .then(
+                            Self::ext(env::current_account_id())
+                            .internal_human_check(funder, proposal, dao_contract)
+                        );
+                }
+                // If no humanity proof required, start check right away.
+                else{
+                    // Begin auto-registration
+                    ext_dao::ext(AccountId::try_from(dao_contract.clone().to_string()).unwrap())
+                    .get_policy()
+                    .then(
+                        Self::ext(env::current_account_id())
+                        .internal_get_roles_callback(funder, proposal, dao_contract)
+                    );
+                }
+            }
+        }
     } 
+
+    #[private]
+    pub fn internal_human_check(funder: AccountId, proposal: ProposalInput, dao_contract: AccountId) {
+         // Parse Response and Check if Fractal is in owned tokens
+        if let PromiseResult::Successful(val) = env::promise_result(0) {
+            if let Ok(proof) = near_sdk::serde_json::from_slice::<Vec<(AccountId, Vec<ClassId>)>>(&val) {
+                let mut human_tokens = proof.into_iter().peekable();
+                log!("New Human Check");
+                require!(human_tokens.peek().is_none() == false, "CLAIMING ACCOUNT MUST BE HUMAN");
+                
+                // Begin auto-registration
+                ext_dao::ext(AccountId::try_from(dao_contract.clone().to_string()).unwrap())
+                .get_policy()
+                .then(
+                    Self::ext(env::current_account_id())
+                    .internal_get_roles_callback(funder, proposal, dao_contract)
+                );
+            } else {
+             env::panic_str("ERR_WRONG_VAL_RECEIVED")
+            }      
+        }
+        else{
+            env::panic_str("PROBLEM WITH PROMISE")
+        }  
+    }
 
     
     // Roles callback, parse and return council role(s)
     #[private]
     pub fn internal_get_roles_callback(&mut self, funder: AccountId, proposal: ProposalInput, dao_contract: AccountId){
         // Receive get_policy promise, parse it and see if funder is on DAO council
-        assert_eq!(env::promise_results_count(), 1, "ERR_TOO_MANY_RESULTS");
-        match env::promise_result(0) {
-            PromiseResult::NotReady => unreachable!(),
-            PromiseResult::Successful(val) => {
+        if let PromiseResult::Successful(val) = env::promise_result(0) {
                 if let Ok(pol) = near_sdk::serde_json::from_slice::<Policy>(&val) {
                     // Trying to collect all roles with name council from policy
                     let members = pol.roles.into_iter()
@@ -156,31 +216,24 @@ impl Contract {
             } else {
                 env::panic_str("ERR_WRONG_VAL_RECEIVED")
             }
-        },
-        PromiseResult::Failed => env::panic_str("ERR_CALL_FAILED"),
         } 
     }
     
     #[private]
     pub fn callback_new_auto_registration(&mut self, dao_contract: AccountId) -> Promise{
         // Get proposal ID from add_proposal promise
-        match env::promise_result(0) {
-            PromiseResult::NotReady => {
-                unreachable!();
-            },
-            PromiseResult::Successful(val) => {
-                if let Ok(proposal_id) = near_sdk::serde_json::from_slice::<u64>(&val) {                 
-                    // Approve proposal that was just added 
-                    ext_dao::ext(AccountId::try_from(dao_contract.clone().to_string()).unwrap())
-                   .act_proposal(proposal_id, Action::VoteApprove, Some("Keypom DAO-Bot auto-registration".to_string()))
-                } else {
-                    env::panic_str("ERR_WRONG_VAL_RECEIVED")
-                }
-            },
-            PromiseResult::Failed => {
-                env::panic_str("ERR_CALL_FAILED");
+        if let PromiseResult::Successful(val) = env::promise_result(0) {
+            if let Ok(proposal_id) = near_sdk::serde_json::from_slice::<u64>(&val) {                 
+                // Approve proposal that was just added 
+                ext_dao::ext(AccountId::try_from(dao_contract.clone().to_string()).unwrap())
+               .act_proposal(proposal_id, Action::VoteApprove, Some("Keypom DAO BOT Auto-Registration".to_string()))
+            } else {
+                env::panic_str("ERR_WRONG_VAL_RECEIVED")
             }
         } 
+        else{
+            env::panic_str("PROBLEM WITH PROMISE")
+        }  
     }
 
     #[private]
