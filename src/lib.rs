@@ -13,6 +13,7 @@ pub const TGAS: u64 = 1_000_000_000_000;
 
 // 0.1 $NEAR
 pub const SPUTNIK_PROPOSAL_DEPOSIT: Balance = 100000000000000000000000;
+pub const ONE_NEAR: u128 = 1000000000000000000000000;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProposalInput {
@@ -32,6 +33,7 @@ pub enum ProposalKind {
 pub struct Policy {
     /// List of roles and permissions for them in the current policy.
     pub roles: Vec<RolePermission>,
+    pub proposal_bond: U128
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize,)]
@@ -124,8 +126,9 @@ impl Contract {
         // Note since ONLY AddMemberToRole defined from proposal.kind, any other proposal types will result in serialization error!
         require!(keypom_args.funder_id_field == Some("funder".to_string()) && keypom_args.account_id_field == Some("proposal.kind.AddMemberToRole.member_id".to_string()), "KEYPOM MUST SEND THESE ARGS");
 
-        // Ensure enough attached deposit was added to add the proposal
-        require!(env::attached_deposit() >= SPUTNIK_PROPOSAL_DEPOSIT, "ATTACH MORE NEAR, AT LEAST 0.1 $NEAR");
+        // // Ensure enough attached deposit was added to add the proposal
+        // require!(env::attached_deposit() >= SPUTNIK_PROPOSAL_DEPOSIT, "ATTACH MORE NEAR, AT LEAST 0.1 $NEAR");
+        near_sdk::log!("Initial Deposit: {}", env::attached_deposit());
 
         // Ensure proposal kind is valid
         match &proposal.kind{
@@ -137,7 +140,7 @@ impl Contract {
                        .is_human(member_id.clone())
                        .then(
                             Self::ext(env::current_account_id())
-                            .internal_human_check(funder, proposal, dao_contract)
+                            .internal_human_check(funder, proposal, dao_contract, env::attached_deposit())
                         );
                 }
                 // If no humanity proof required, start check right away.
@@ -147,7 +150,7 @@ impl Contract {
                     .get_policy()
                     .then(
                         Self::ext(env::current_account_id())
-                        .internal_get_roles_callback(funder, proposal, dao_contract)
+                        .internal_get_roles_callback(funder, proposal, dao_contract, env::attached_deposit())
                     );
                 }
             }
@@ -155,7 +158,7 @@ impl Contract {
     } 
 
     #[private]
-    pub fn internal_human_check(funder: AccountId, proposal: ProposalInput, dao_contract: AccountId) {
+    pub fn internal_human_check(funder: AccountId, proposal: ProposalInput, dao_contract: AccountId, found_deposit: Balance) {
          // Parse Response and Check if Fractal is in owned tokens
         if let PromiseResult::Successful(val) = env::promise_result(0) {
             if let Ok(proof) = near_sdk::serde_json::from_slice::<Vec<(AccountId, Vec<ClassId>)>>(&val) {
@@ -168,7 +171,8 @@ impl Contract {
                 .get_policy()
                 .then(
                     Self::ext(env::current_account_id())
-                    .internal_get_roles_callback(funder, proposal, dao_contract)
+                    .with_attached_deposit(env::attached_deposit())
+                    .internal_get_roles_callback(funder, proposal, dao_contract, found_deposit)
                 );
             } else {
              env::panic_str("ERR_WRONG_VAL_RECEIVED")
@@ -182,10 +186,16 @@ impl Contract {
     
     // Roles callback, parse and return council role(s)
     #[private]
-    pub fn internal_get_roles_callback(&mut self, funder: AccountId, proposal: ProposalInput, dao_contract: AccountId){
+    pub fn internal_get_roles_callback(&mut self, funder: AccountId, proposal: ProposalInput, dao_contract: AccountId, found_deposit: Balance){
         // Receive get_policy promise, parse it and see if funder is on DAO council
         if let PromiseResult::Successful(val) = env::promise_result(0) {
                 if let Ok(pol) = near_sdk::serde_json::from_slice::<Policy>(&val) {
+                    // Get proposal bond amount
+                    let bond_amount: u128 = pol.proposal_bond.into();
+                    near_sdk::log!("DAO BOND AMOUNT: {:.12} near", (bond_amount as f64/ONE_NEAR as f64));
+                    near_sdk::log!("AMOUNT PASSED INTO CALLBACK: {} yocto", found_deposit);
+                    require!(found_deposit >= bond_amount as Balance, format!("ATTACH MORE NEAR, AT LEAST {:.12} $NEAR", (bond_amount as f64/ONE_NEAR as f64)));
+                    
                     // Trying to collect all roles with name council from policy
                     let members = pol.roles.into_iter()
                     .filter(|role| role.name == "council".to_string())
@@ -200,7 +210,7 @@ impl Contract {
                             if set.contains(&AccountId::try_from(funder.to_string()).unwrap()){
                                 // Add proposal to register member if funder is on council
                                 ext_dao::ext(AccountId::try_from(dao_contract.clone().to_string()).unwrap())
-                                .with_attached_deposit(SPUTNIK_PROPOSAL_DEPOSIT)
+                                .with_attached_deposit(bond_amount as Balance)
                                 .add_proposal(proposal)
                                 .then(
                                     Self::ext(env::current_account_id())
