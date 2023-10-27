@@ -1,5 +1,5 @@
 [package]
-name = "dao-bot"
+name = "access-key-marketplace"
 version = "1.0.0"
 authors = ["Min Qian Lu"]
 edition = "2021"
@@ -21,4 +21,5 @@ panic = "abort"
 overflow-checks = true
 
 [workspace]
-members = []
+members = [
+]

@@ -1,23 +1,19 @@
+
 use near_sdk::ext_contract;
+
 
 use crate::*;
 
-#[ext_contract(ext_dao)]
-trait ExtDao{
 
-    fn get_policy(&self) -> Policy;
+#[ext_contract(ext_keypom)]
+trait ExtKeypom{
 
-    fn act_proposal(&mut self, id: u64, action: Action, memo: Option<String>);
+    fn add_keys(&mut self, drop_id: DropId, key_data: Vec<ExtKeyData>, keep_excess_deposit: Option<bool>) -> bool;
 
-    fn add_proposal(&mut self, proposal: ProposalInput);
-}
+    fn nft_token(&self, token_id: TokenId) -> Option<ExtNFTKey>;
 
-#[ext_contract(ext_sbt_registry)]
-trait ExtSBTRegistry{
+    fn nft_transfer(&mut self, token_id: Option<TokenId>, receiver_id: Option<AccountId>, approval_id: Option<u64>, memo: PublicKey);
 
-    fn is_human(&self, account: AccountId) -> Vec<(AccountId, Vec<ClassId>)>;
-
-    fn sbt_tokens_by_owner(&self, account: AccountId, issuer: Option<AccountId>, from_class: Option<u64>, limit: Option<u32>, with_expired: Option<bool>) -> Vec<(AccountId, Vec<OwnedToken>)>;
 }
 
 // #[ext_contract(ext_self)]
