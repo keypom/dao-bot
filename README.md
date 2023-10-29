@@ -1,3 +1,3 @@
-This is a DAO bot meant to facilitate auto-registration into DAOs by leveraging [Keypom Function Call Drops](https://docs.keypom.xyz/docs/next/Concepts/KeypomProtocol/GithubReadme/TypesOfDrops/fc-drops).
+Primary and Secondary Marketplace for Access Keys with a focus on event tickets. Built off of Keypom tradeable access key model. 
 
-To learn more, visit the [DAO tutorial](https://docs.keypom.xyz/docs/next/Tutorials/Advanced/daos/introduction).
+More coming soon...
