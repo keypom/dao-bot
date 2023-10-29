@@ -6,7 +6,12 @@ use crate::*;
 pub enum StorageKeys {
     //AssetById { drop_id_hash: CryptoHash },
     //TokensPerOwnerInner { account_id_hash: CryptoHash },
-    ResalePerDrop,
+    ResalePerEvent,
+    EventInfoPerDrop,
+    
+    EventByDropId,
+    KeysByDropId,
+    
     KeysPerDrop,
     MaxPricePerKey,
     ApprovalIDByPk,

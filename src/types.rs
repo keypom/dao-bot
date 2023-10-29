@@ -7,12 +7,37 @@ pub type UseNumber = u32;
 /// ID for NFTs that have been sent to the Keypom contract as part of NFT assets
 pub type TokenId = String;
 
+/// The ID for a given event (this is the unique identifier for the drop and is how it will be referenced)
+pub type EventID = String;
+
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct ResaleConditions {
     // Maximum price that a ticket can be resold for
     pub max_price: Balance
+}
+
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone)]
+#[serde(crate = "near_sdk::serde")]
+pub struct EventDetails {
+    // Public Facing event name
+    pub name: String,
+    // Event ID, in case on needing to abstract on contract to multiple drops per event
+    // For now, event ID is drop ID
+    pub event_id: String,
+    // Maximum number of tickets
+    pub max_tickets: HashMap<DropId, u64>,
+    // Associated Drop IDs
+    pub drop_ids: HashSet<DropId>,
+    // Description
+    pub description: String,
+    // Date
+    pub date: String,
+    // Tiered Pricing?
+    pub price_by_drop_id: HashMap<DropId, u64>,
+    
+    // Every event should be capable of tiered ticketing, i.e multiple drops per event
 }
 
 
