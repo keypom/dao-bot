@@ -12,7 +12,7 @@ pub enum StorageKeys {
     EventByDropId,
     KeysByDropId,
     
-    KeysPerDrop,
     MaxPricePerKey,
     ApprovalIDByPk,
+    ResaleForPK,
 }
