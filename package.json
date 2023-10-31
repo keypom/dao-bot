@@ -8,7 +8,8 @@
   "license": "MIT",
   "scripts": {
     "test:auto-reg": "ava __tests__/auto-registration/auto-reg-tests.ava.ts",
-    "test:auto-reg-v1": "ava __tests__/auto-registration/v1-auto-reg-tests.ava.ts"
+    "test:auto-reg-v1": "ava __tests__/auto-registration/v1-auto-reg-tests.ava.ts",
+    "build-contract": "./build.sh"
   },
   "dependencies": {
     "crypto": "^1.0.1",

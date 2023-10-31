@@ -82,6 +82,31 @@ pub struct Marketplace {
     pub resale_per_pk: LookupMap<PublicKey, Balance>
 }
 
+impl Default for Marketplace{
+    fn default() -> Self{
+        Self{
+            /// **************** Admin Stuff ****************
+            contract_owner_id: AccountId::try_from("minqi.testnet".to_string()).unwrap(),
+            global_freeze: false,
+            /// **************** Keypom ****************
+            keypom_contract: AccountId::try_from("testing-nearcon-keypom.testnet".to_string()).unwrap(),
+            // **************** By Event ID ****************
+            event_by_id: UnorderedMap::new(StorageKeys::EventInfoPerDrop),
+            resales_for_event: LookupMap::new(StorageKeys::ResalePerEvent),
+            // **************** By Drop ****************
+            approved_drops: HashSet::new(),
+            event_by_drop_id: LookupMap::new(StorageKeys::EventByDropId),
+            listed_keys_per_drop: LookupMap::new(StorageKeys::KeysByDropId),
+            // **************** By Key ****************
+            //drop_per_key: LookupMap::new(StorageKeys::KeysPerDrop),
+            max_price_per_dropless_key: LookupMap::new(StorageKeys::MaxPricePerKey),
+            approval_id_by_pk: LookupMap::new(StorageKeys::ApprovalIDByPk),
+            resale_per_pk: LookupMap::new(StorageKeys::ResaleForPK),
+        }
+    }
+}
+
+
 
 #[near_bindgen]
 impl Marketplace {
