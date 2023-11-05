@@ -3,12 +3,14 @@ use crate::*;
 #[near_bindgen]
 impl Marketplace {
     /// Set the contract to be frozen thus not allowing any drops to be created or keys added
+   #[private]
     pub fn freeze_contract(&mut self) {
         self.assert_owner();
         self.global_freeze = true
     }
     
     /// Set the contract to be unfrozen thus resuming the ability for drops and keys to be created
+    #[private]
     pub fn unfreeze_contract(&mut self) {
         self.assert_owner();
         self.global_freeze = false;

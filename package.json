@@ -7,21 +7,27 @@
   "author": "Min Qian Lu <59981815+minqianlu@users.noreply.github.com>",
   "license": "MIT",
   "scripts": {
-    "test:auto-reg": "ava __tests__/auto-registration/auto-reg-tests.ava.ts",
-    "test:auto-reg-v1": "ava __tests__/auto-registration/v1-auto-reg-tests.ava.ts",
+    "test:basic": "ava __tests__/basic-tests.ava.ts",
     "build-contract": "./build.sh"
   },
   "dependencies": {
     "crypto": "^1.0.1",
     "gh-pages": "^4.0.0",
-    "keypom-js": "^1.4.9"
+    "@keypom/core": "^1.0.1"
   },
   "devDependencies": {
-    "@types/bn.js": "^5.1.0",
-    "ava": "5.0.1",
-    "near-api-js": "^0.44.2",
-    "near-workspaces": "3.2.2",
-    "ts-node": "^10.8.0",
-    "typescript": "^4.6.4"
-  }
+		"@types/bn.js": "^5.1.0",
+		"ava": "^5.0.1",
+		"near-workspaces": "3.2.2",
+		"ts-node": "^10.8.0",
+		"typescript": "^4.6.4",
+		"@near-js/accounts": "^0.1.3",
+    "@near-js/crypto": "^0.0.4",
+    "@near-js/keystores-node": "^0.0.4",
+    "@near-js/keystores-browser": "^0.0.4",
+    "@near-js/transactions": "^0.2.0",
+    "@near-js/types": "^0.0.4",
+    "@near-js/utils": "^0.0.4",
+    "@near-js/wallet-account": "^0.0.6"
+	}
 }

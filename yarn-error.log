@@ -1,0 +1,67 @@
+Arguments: 
+  /usr/local/bin/node /usr/local/bin/yarn
+
+PATH: 
+  /opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Library/Apple/usr/bin:/Users/min/Library/pnpm:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/min/.cargo/bin
+
+Yarn version: 
+  1.22.19
+
+Node version: 
+  16.15.1
+
+Platform: 
+  darwin arm64
+
+Trace: 
+  Error: https://registry.yarnpkg.com/@keypom-core: Request "https://registry.yarnpkg.com/@keypom-core" returned a 405
+      at Request.params.callback [as _callback] (/usr/local/lib/node_modules/yarn/lib/cli.js:66154:18)
+      at Request.self.callback (/usr/local/lib/node_modules/yarn/lib/cli.js:140890:22)
+      at Request.emit (node:events:527:28)
+      at Request.<anonymous> (/usr/local/lib/node_modules/yarn/lib/cli.js:141862:10)
+      at Request.emit (node:events:527:28)
+      at IncomingMessage.<anonymous> (/usr/local/lib/node_modules/yarn/lib/cli.js:141784:12)
+      at Object.onceWrapper (node:events:641:28)
+      at IncomingMessage.emit (node:events:539:35)
+      at endReadableNT (node:internal/streams/readable:1345:12)
+      at processTicksAndRejections (node:internal/process/task_queues:83:21)
+
+npm manifest: 
+  {
+    "name": "dao-bot",
+    "version": "1.0.0",
+    "description": "keypom dao bot, meant to only be called by keypom fc call. 1 dao bot per dao",
+    "main": "index.js",
+    "repository": "https://github.com/keypom/dao-bot.git",
+    "author": "Min Qian Lu <59981815+minqianlu@users.noreply.github.com>",
+    "license": "MIT",
+    "scripts": {
+      "test:basic": "ava __tests__/basic-tests.ava.ts",
+      "build-contract": "./build.sh"
+    },
+    "dependencies": {
+      "crypto": "^1.0.1",
+      "gh-pages": "^4.0.0",
+      "@keypom-core": "^1.0.1"
+    },
+    "devDependencies": {
+  		"@types/bn.js": "^5.1.0",
+  		"ava": "^5.0.1",
+  		"near-workspaces": "3.2.2",
+  		"ts-node": "^10.8.0",
+  		"typescript": "^4.6.4",
+  		"@near-js/accounts": "^0.1.3",
+      "@near-js/crypto": "^0.0.4",
+      "@near-js/keystores-node": "^0.0.4",
+      "@near-js/transactions": "^0.2.0",
+      "@near-js/types": "^0.0.4",
+      "@near-js/utils": "^0.0.4",
+      "@near-js/wallet-account": "^0.0.6"
+  	}
+  }
+
+yarn manifest: 
+  No manifest
+
+Lockfile: 
+  No lockfile

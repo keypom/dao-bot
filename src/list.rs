@@ -10,7 +10,8 @@ impl Marketplace {
     #[payable]
     pub fn list_event(
         &mut self, 
-        event_name: String,
+        event_id: EventID,
+        event_name: Option<String>,
         description: Option<String>,
         date: Option<String>,
         host: Option<AccountId>,
@@ -26,6 +27,7 @@ impl Marketplace {
         near_sdk::log!("initial bytes {}", initial_storage);
 
         let final_event_details = self.create_event_details(
+            event_id, 
             event_name, 
             description, 
             date, 
@@ -58,6 +60,7 @@ impl Marketplace {
     }
     
     // List a ticket, apply constraints from drop or generate own if not associated with known drop
+    #[payable]
     pub fn list_ticket(
         &mut self,
         key: ExtKeyData,
@@ -199,6 +202,7 @@ impl Marketplace {
 
     // TODO: VERIFY IF ALL NECESSARY DATA STRUCTURES ARE UPDATED HERE
     // Add drop to an existing event
+    #[payable]
     pub fn add_drop_to_event(
         &mut self, 
         event_id: EventID,

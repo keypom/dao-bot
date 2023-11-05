@@ -1,9 +1,11 @@
 use crate::*;
 
+#[near_bindgen]
 impl Marketplace{
     pub(crate) fn create_event_details(
         &mut self,
-        event_name: String,
+        event_id: EventID,
+        event_name: Option<String>,
         description: Option<String>,
         date: Option<String>,
         host: Option<AccountId>,
@@ -13,15 +15,7 @@ impl Marketplace{
         price_by_drop_id: Option<HashMap<DropId, Option<Balance>>>,
     ) -> EventDetails{
 
-        // event ID, add number at the end if needed
-        let mut event_id = format!("{}{}", event_name.replace(" ", "-"),env::predecessor_account_id());
-        let mut event_already_exist = self.event_by_id.get(&event_id).is_some();
-        let mut itr = 0;
-        while event_already_exist {
-            event_id = format!("{}-{}", event_id, itr.to_string());
-            event_already_exist = self.event_by_id.get(&event_id).is_some();
-            itr += 1;
-        }
+        require!(self.event_by_id.get(&event_id).is_none(), "Event ID already exists!");
 
         let event_details = EventDetails{
             name: event_name,

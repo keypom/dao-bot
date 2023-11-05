@@ -11,6 +11,17 @@ crate-type = ["cdylib"]
 near-sdk = "4.0.0"
 uint = { version = "0.9.3", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
+near-workspaces = { version = "0.7.0", features = ["unstable"]  }
+tokio = { version = "1.10.0", features = ["full"] }
+serde_json = { version = "1.0", features = ["arbitrary_precision"] }
+near-units = "0.2.0"
+anyhow = "1.0"
+
+
+[dev-dependencies]
+insta = { version = "1.31.0", features = ["json", "redactions"] }
+regex = "1"
+
 
 [profile.release]
 codegen-units = 1
@@ -21,5 +32,9 @@ panic = "abort"
 overflow-checks = true
 
 [workspace]
-members = [
-]
+members = []
+
+[[bin]]
+name = "tests"
+path = "tests/main.rs"
+

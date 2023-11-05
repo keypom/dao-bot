@@ -32,7 +32,7 @@ pub enum Status {
 #[serde(crate = "near_sdk::serde")]
 pub struct EventDetails {
     // Public Facing event name
-    pub name: String,
+    pub name: Option<String>,
     // Event hosts, not necessarily the same as all the drop funders
     pub host: Option<AccountId>,
     // Event ID, in case on needing to abstract on contract to multiple drops per event

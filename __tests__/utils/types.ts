@@ -1,148 +1,116 @@
-export type JsonDrop = {
-    drop_id: string;
-    owner_id: string,
-    deposit_per_use: string;
-    simple?: SimpleData;
-    nft?: JsonNFTData;
-    ft?: FTData;
-    fc?: FCData;
-    config: DropConfig | null;
-    metadata: string | null;
-    registered_uses: number;
-    required_gas: string;
-    next_key_id: number;
-}
-
-export type JsonToken = {
-    series_id: number;
-    token_id: string;
-    owner_id: string;
-    metadata: TokenMetadata;
-    approved_account_ids: Record<string, number>;
-    royalty: Record<string, number> | null;
-}
-
-export type JsonNFTData = {
-    sender_id?: string;
-    contract_id: string;
-}
-
-export type SimpleData = {
-    lazy_register?: boolean
-}
-
-export type FTData = {
-    sender_id?: string;
-    contract_id: string;
-    balance_per_use: string;
-}
-
-export type FCData = {
-    methods: Array<(MethodData | null)[]>
-}
-
-export type FCConfig = {
-    attached_gas?: string
-}
-
-export type MethodData = {
-    receiver_id: string;
-    method_name: string;
-    args: string;
-    attached_deposit: string;
-    attached_gas?: string;
-    account_id_field?: string;
-    drop_id_field?: string;
-    key_id_field?: string;
-    funder_id_field?: string;
-    user_args_rule?: string;
-}
-
-export type JsonKeyInfo = {
-    drop_id: string;
-    pk: string;
-    // How many uses this key has left. Once 0 is reached, the key is deleted
-    remaining_uses: number,
-    // When was the last time the key was used
-    last_used: number,
-    // How much allowance does the key have left. When the key is deleted, this is refunded to the funder's balance.
-    allowance: number,
-    // Nonce for the current key.
-    key_id: number,
-    // Which use is the key currently on?
-    cur_key_use: number
-}
-
-export type KeyInfo = {
-    remaining_uses: number;
-    last_used: number;
-    allowance: number;
-    key_id: number;
-}
-
-export type TimeConfig = {
-    start?: number;
-    end?: number;
-    throttle?: number;
-    interval?: number;
-}
-
-export type JsonPublicSaleConfig = {
-    /// Maximum number of keys that can be added to this drop. If None, there is no max.
-    max_num_keys?: number;
- 
-    /// Amount of $NEAR that the user needs to attach (if they are not the funder) on top of costs. This amount will be
-    /// Automatically sent to the funder's balance. If None, the keys are free to the public.
-    price_per_key?: string;
-
-    /// Should the revenue generated be sent to the funder's account balance or
-    /// automatically withdrawn and sent to their NEAR wallet?
-    auto_withdraw_funds?: boolean;
-
-    allowlist? : string[];
-    blocklist? : string[];
-
-    /// Minimum block timestamp before the public sale starts. If None, keys can be added immediately
-    /// Measured in number of non-leap-nanoseconds since January 1, 1970 0:00:00 UTC.
-    start?: number;
-
-    /// Block timestamp dictating the end of the public sale. If None, keys can be added indefinitely
-    /// Measured in number of non-leap-nanoseconds since January 1, 1970 0:00:00 UTC.
-    end?: number;
-}
-
-export type UsageConfig = {
-    permissions?: string;
-    refund_deposit?: boolean;
-    auto_delete_drop?: boolean;
-    auto_withdraw?: boolean;
-    account_creation_fields?: {
-        account_id_field?: String,
-        drop_id_field?: String,
-        key_id_field?: String,
-        funder_id_field?: String,
-    }
+export type ExtDrop = {
+    assets_by_use: Record<number, Array<ExtAsset>>;
+    nft_asset_data: Array<InternalNFTData>;
+    ft_asset_data: Array<InternalFTData>;
+    drop_config?: DropConfig|null;
 }
 
 export type DropConfig = {
-    uses_per_key?: number;
-    time?: TimeConfig;
-    usage?: UsageConfig;
-    sale?: JsonPublicSaleConfig;
-    root_account_id?: string;
+    add_key_allowlist?: Array<string>|null,
+}
+
+export type AddedDropDetails = {
+    // Maximum number of tickets
+    max_tickets: number|undefined,
+    // Tiered Pricing?
+    price_by_drop_id: number|undefined,
+    
+    // Every event should be capable of tiered ticketing, i.e multiple drops per event
+}
+
+export type EventDetails = {
+    // Public Facing event name
+    name: string|undefined,
+    // Event hosts, not necessarily the same as all the drop funders
+    host: string|undefined,
+    // Event ID, in case on needing to abstract on contract to multiple drops per event
+    // For now, event ID is drop ID
+    event_id: String,
+    // Event Status, can only be active or inactive
+    status: string,
+    // Description
+    description: string|undefined,
+    // Date
+    date: string|undefined,
+    // Maximum markup, as a %
+    max_markup: number,
+    // Maximum number of tickets
+    max_tickets: Record<string, number|undefined>,
+    // Associated Drop IDs
+    // drop - tier link create here, either implicitely through vec or unorderedmap 
+    drop_ids: [string],
+    // Tiered Pricing?
+    price_by_drop_id: Record<string, number|undefined>
+    
+    // Every event should be capable of tiered ticketing, i.e multiple drops per event
+}
+
+export type UserProvidedFCArgs = Array<AssetSpecificFCArgs>;
+export type AssetSpecificFCArgs = Array<string | undefined> | undefined;
+
+export type PickOnly<T, K extends keyof T> =
+    Pick<T, K> & { [P in Exclude<keyof T, K>]?: never };
+    
+export type ExtKeyInfo = {
+    /// How much Gas should be attached when the key is used to call `claim` or `create_account_and_claim`.
+    /// It is up to the smart contract developer to calculate the required gas (which can be done either automatically on the contract or on the client-side).
+    required_gas: string,
+
+    /// yoctoNEAR$ amount that will be sent to the account that claims the linkdrop (either new or existing)
+    /// when the key is successfully used.
+    yoctonear: string,
+
+    /// If using the FT standard extension, a set of FTData can be linked to the public key
+    /// indicating that all those assets will be sent to the account that claims the linkdrop (either new or
+    /// existing) when the key is successfully used.
+    ft_list: Array<ExtFTData>, 
+
+    /* CUSTOM */
+    uses_remaining: Number,
+    token_id: string,
+    owner_id: string,
+}
+
+export type InternalAsset = InternalFTData | InternalNFTData | "near";
+
+export type InternalFTData = {
+    contract_id: string;
+    registration_cost: string,
+    balance_avail: string
+}
+
+export type InternalNFTData = {
+    contract_id: string;
+    token_ids: Array<string>
 }
 
 export type TokenMetadata = {
-    title: string | null;
-    description: string | null;
-    media: string | null;
-    media_hash: string | null;
-    copies: number | null;
-    issued_at: number | null;
-    expires_at: number | null;
-    starts_at: number | null;
-    updated_at: number | null;
-    extra: string | null;
-    reference: string | null;
-    reference_hash: string | null;
+    title: string|undefined,
+    description: string,
+    media: string,
+    media_hash: string|undefined,
+    copies: number|undefined,
+    issued_at: number|undefined,
+    expires_at: number|undefined,
+    starts_at: number|undefined,
+    updated_at: number|undefined,
+    extra: string|undefined,
+    reference: string|undefined,
+    reference_hash: number[]|undefined
+}
+
+export type ExtAsset = ExtFTData;
+
+export type ExtFTData = {
+    ft_contract_id: string;
+    registration_cost: string,
+    ft_amount: string
+}
+
+export type ExtNFTData = {
+    nft_contract_id: string
+}
+
+export type ExtNearData = {
+    yoctonear: string
 }
