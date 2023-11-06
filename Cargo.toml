@@ -36,5 +36,5 @@ members = []
 
 [[bin]]
 name = "tests"
-path = "tests/main.rs"
+path = "tests/basic-test.rs"
 
