@@ -4,8 +4,8 @@ version = "1.0.0"
 authors = ["Min Qian Lu"]
 edition = "2021"
 
-[lib]
-crate-type = ["cdylib"]
+# [lib]
+# crate-type = ["cdylib"]
 
 [dependencies]
 near-sdk = "4.0.0"
@@ -23,18 +23,15 @@ insta = { version = "1.31.0", features = ["json", "redactions"] }
 regex = "1"
 
 
-[profile.release]
-codegen-units = 1
-opt-level = "z"
-lto = true
-debug = false
-panic = "abort"
-overflow-checks = true
+# [profile.release]
+# codegen-units = 1
+# opt-level = "z"
+# lto = true
+# debug = false
+# panic = "abort"
+# overflow-checks = true
 
-[workspace]
-members = []
-
-[[bin]]
-name = "tests"
-path = "tests/basic-test.rs"
+# [[bin]]
+# name = "tests"
+# path = "tests/basic-test.rs"
 

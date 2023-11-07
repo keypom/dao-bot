@@ -42,6 +42,8 @@ pub const TGAS: u64 = 1_000_000_000_000;
 // 0.1 $NEAR
 pub const SPUTNIK_PROPOSAL_DEPOSIT: Balance = 100000000000000000000000;
 
+// TODO: VERIFY PUBLIC-KEY VS TOKEN_ID ON KEYPOM SIDE, WHAT IS NEEDED?
+
 // Define the contract structure
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -62,6 +64,8 @@ pub struct Marketplace {
     // Key resales per event
     // Frontend can get drop ID and thus base pricing for each key using get_key_information_batch 
     pub resales_for_event: LookupMap<EventID, Option<Vec<PublicKey>>>,
+
+    // TODO: STORE KEY PASSWORD SOMEWHERE? HOW DOES FRONTEND KNOW WHAT PASSWORD TO PASS IN?
 
     // **************** By Drop ****************
     // Drops that the marketplace can add keys to, by DropID
